@@ -6,9 +6,10 @@ using OpenTK.Windowing.Desktop;
 
 namespace Clouds
 {
-    public class Window : GameWindow
+    public abstract class Window : GameWindow
     {
         ImGuiController _controller;
+        Color4 clearColor = new(0, 32, 48, 255);
 
         public Window() : base(GameWindowSettings.Default, new NativeWindowSettings() { ClientSize = new Vector2i(1600, 900), APIVersion = new Version(3, 3) })
         { }
@@ -39,20 +40,20 @@ namespace Clouds
 
             _controller.Update(this, (float)e.Time);
 
-            GL.ClearColor(new Color4(0, 32, 48, 255));
+            GL.ClearColor(clearColor);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
-            // Enable Docking
-            //ImGui.DockSpaceOverViewport();
+            RenderScene();
 
-            ImGui.ShowDemoWindow();
-
+            RenderGUI();
             _controller.Render();
-
             ImGuiController.CheckGLError("End of frame");
 
             SwapBuffers();
         }
+
+        protected abstract void RenderScene();
+        protected abstract void RenderGUI();
 
         protected override void OnTextInput(TextInputEventArgs e)
         {
