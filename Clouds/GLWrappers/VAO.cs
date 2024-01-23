@@ -16,7 +16,7 @@ namespace Clouds.GLWrappers
             GL.BindVertexArray(ID);
         }
 
-        static void Unbind()
+        public static void Unbind()
         {
             GL.BindVertexArray(0);
         }

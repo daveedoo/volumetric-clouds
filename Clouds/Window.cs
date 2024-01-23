@@ -11,7 +11,7 @@ namespace Clouds
         ImGuiController _controller;
         Color4 clearColor = new(0, 32, 48, 255);
 
-        public Window() : base(GameWindowSettings.Default, new NativeWindowSettings() { ClientSize = new Vector2i(1600, 900), APIVersion = new Version(3, 3) })
+        public Window(Vector2i clientSize) : base(GameWindowSettings.Default, new NativeWindowSettings() { ClientSize = clientSize, APIVersion = new Version(3, 3) })
         { }
 
         protected override void OnLoad()

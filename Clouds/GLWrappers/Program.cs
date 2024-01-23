@@ -52,6 +52,14 @@ namespace Clouds.GLWrappers
             operation(location);
         }
 
+        public void SetVec2(string uniformName, Vector2 value)
+        {
+            ExecuteUniformVariableOperation(uniformName, (int location) =>
+            {
+                GL.Uniform2(location, value);
+            });
+        }
+
         public void SetVec3(string uniformName, Vector3 value)
         {
             ExecuteUniformVariableOperation(uniformName, (int location) =>
