@@ -8,6 +8,8 @@ uniform vec3 cloudsBoxCenter;
 uniform float cloudsBoxSideLength;
 uniform float cloudsBoxHeight;
 
+uniform sampler2D cloudsTexture;
+
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
@@ -38,21 +40,40 @@ vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
     return vec2(distanceToBox, distanceInBox);
 }
 
+// all values need to be within [0, 1]
+float getCloudValue(vec2 texCoords, float height)
+{
+    vec4 cloud = texture(cloudsTexture, texCoords);
+    return cloud.r;
+}
+
 void main()
 {
     vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
     float dstToBox = intersection.x;
     float dstInBox = intersection.y;
-
     if (dstInBox == 0)
     {
         discard;
     }
 
-//    vec3 rayMarchStartPoint = cameraPos + dstToBox*rayDir;
+    // ray-marching loop
+    float RAYMARCH_STEP = 0.01f;
+    float density = 0.0f;
+    vec3 samplePoint = cameraPos + dstToBox*rayDir;
+    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
+    {
+        samplePoint += RAYMARCH_STEP * rayDir;
 
+        vec3 boxPoint = cloudsBoxCenter - samplePoint;
+        vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
+        float height = boxPoint.y / cloudsBoxHeight + 0.5f;
 
+        float cloud = getCloudValue(texCoords, height);
 
-    FragColor = vec4(dstInBox, dstInBox, dstInBox, 1.0f);
-//    FragColor = vec4(rayMarchStartPoint, 1.0f);
+        // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
+        density += RAYMARCH_STEP * cloud;
+    }
+
+    FragColor = vec4(density, density, density, 1.0f);
 }

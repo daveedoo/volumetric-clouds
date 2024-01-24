@@ -27,6 +27,7 @@ namespace Clouds
 
             SetupShaders();
             SetupVAO();
+            SetupTexture();
         }
 
         private void SetupVAO()
@@ -56,6 +57,34 @@ namespace Clouds
             SetCloudBoxUniforms();
             SetViewMatrix();
             SetProjectionMatrix();
+        }
+
+        private void SetupTexture()
+        {
+            const int cloudsTextureUnit = 0;
+
+            int texId = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, texId);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+
+            (byte[] data, int texSize)= GetCloudTextureData();
+            
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
+
+            program.SetInt("cloudsTexture", cloudsTextureUnit);
+        }
+
+        // TODO: decide if byte type is the best
+        private (byte[] data, int textureSize) GetCloudTextureData()
+        {
+            int texSize = 512;
+            // mock
+            return (Enumerable.Repeat<byte>(50, 4 * texSize * texSize).ToArray(), texSize);
         }
 
         private void SetCloudBoxUniforms()

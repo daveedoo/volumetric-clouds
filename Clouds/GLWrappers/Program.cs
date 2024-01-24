@@ -90,5 +90,12 @@ namespace Clouds.GLWrappers
                 GL.UniformMatrix4(location, false, ref value);
             });
         }
+        public void SetInt(string uniformName, int value)
+        {
+            ExecuteUniformVariableOperation(uniformName, (int location) =>
+            {
+                GL.Uniform1(location, value);
+            });
+        }
     }
 }
