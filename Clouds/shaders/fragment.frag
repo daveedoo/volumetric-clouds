@@ -1,16 +1,21 @@
 #version 330 core
-in vec3 viewVec;
+in vec3 rayDir;
 out vec4 FragColor;
 
 uniform vec3 cameraPos;
-uniform vec3 cloudsBoxMin;
-uniform vec3 cloudsBoxMax;
+
+uniform vec3 cloudsBoxCenter;
+uniform float cloudsBoxSideLength;
+uniform float cloudsBoxHeight;
 
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
 {
     // https://github.com/SebLague/Clouds/blob/master/Assets/Scripts/Clouds/Shaders/Clouds.shader#L121
+    vec3 offset = vec3(cloudsBoxSideLength / 2, cloudsBoxHeight / 2, cloudsBoxSideLength / 2);;
+    vec3 cloudsBoxMin = cloudsBoxCenter - offset;
+    vec3 cloudsBoxMax = cloudsBoxCenter + offset;
 
     vec3 t0 = (cloudsBoxMin - rayOrigin) / raydir;
     vec3 t1 = (cloudsBoxMax - rayOrigin) / raydir;
@@ -35,11 +40,19 @@ vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
 
 void main()
 {
-    vec2 intersection = testCloudsBoxIntersection(cameraPos, viewVec);
-    if (intersection.y == 0)
+    vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
+    float dstToBox = intersection.x;
+    float dstInBox = intersection.y;
+
+    if (dstInBox == 0)
     {
         discard;
     }
-//    FragColor = vec4(0.3f, 0.3f, 0.3f, 1.0f);
-    FragColor = vec4(intersection.y, intersection.y, intersection.y, 1.0f);
+
+//    vec3 rayMarchStartPoint = cameraPos + dstToBox*rayDir;
+
+
+
+    FragColor = vec4(dstInBox, dstInBox, dstInBox, 1.0f);
+//    FragColor = vec4(rayMarchStartPoint, 1.0f);
 }

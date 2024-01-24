@@ -15,8 +15,9 @@ namespace Clouds
         private System.Numerics.Vector3 cameraTarget = new(0.0f);
         private float cameraFOV = 90; // degrees
 
-        private System.Numerics.Vector3 cloudBoxMin = new(-1.0f, -1.0f, 1.0f);
-        private System.Numerics.Vector3 cloudBoxMax = new(1.0f, 1.0f, -1.0f);
+        private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
+        private float cloudsBoxSideLength = 2.0f;
+        private float cloudsBoxHeight = 2.0f;
 
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
@@ -50,14 +51,19 @@ namespace Clouds
             using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.vert");
             using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.frag");
             program = new(vertexShader, fragmentShader);
+            
             program.SetVec3("cameraPos", new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z));
-            program.SetVec3("cloudsBoxMin", new Vector3(cloudBoxMin.X, cloudBoxMin.Y, cloudBoxMin.Z));
-            program.SetVec3("cloudsBoxMax", new Vector3(cloudBoxMax.X, cloudBoxMax.Y, cloudBoxMax.Z));
-
+            SetCloudBoxUniforms();
             SetViewMatrix();
             SetProjectionMatrix();
         }
 
+        private void SetCloudBoxUniforms()
+        {
+            program.SetVec3("cloudsBoxCenter", new Vector3(cloudsBoxCenter.X, cloudsBoxCenter.Y, cloudsBoxCenter.Z));
+            program.SetFloat("cloudsBoxSideLength", cloudsBoxSideLength);
+            program.SetFloat("cloudsBoxHeight", cloudsBoxHeight);
+        }
         private void SetViewMatrix()
         {
             Matrix4 viewMtx = Matrix4.LookAt(
@@ -88,7 +94,7 @@ namespace Clouds
             ImGui.ShowDemoWindow();
 
             ImGui.Begin("-");
-            if (ImGui.TreeNode("Camera"))
+            if (ImGui.TreeNodeEx("Camera", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat3("Camera Position", ref cameraPosition, 0.01f))
                 {
@@ -104,17 +110,21 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
-            if (ImGui.TreeNode("Clouds box"))
+            if (ImGui.TreeNodeEx("Clouds box", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                if (ImGui.DragFloat3("CloudBoxMin", ref cloudBoxMin))
+                if (ImGui.DragFloat3("Center", ref cloudsBoxCenter, 0.01f))
                 {
-                    program.SetVec3("cloudsBoxMin", new Vector3(cloudBoxMin.X, cloudBoxMin.Y, cloudBoxMin.Z));
+                    SetCloudBoxUniforms();
                 }
-                if (ImGui.DragFloat3("CloudBoxMax", ref cloudBoxMax))
+                if (ImGui.DragFloat("SideLength", ref cloudsBoxSideLength, 0.01f, 0.1f, float.MaxValue))
                 {
-                    program.SetVec3("cloudsBoxMax", new Vector3(cloudBoxMax.X, cloudBoxMax.Y, cloudBoxMax.Z));
+                    SetCloudBoxUniforms();
                 }
-
+                if (ImGui.DragFloat("Height", ref cloudsBoxHeight, 0.01f, 0.1f, float.MaxValue))
+                {
+                    SetCloudBoxUniforms();
+                }
+                ImGui.TreePop();
             }
             ImGui.End();
         }
