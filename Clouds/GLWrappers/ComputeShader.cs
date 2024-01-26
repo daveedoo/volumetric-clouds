@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL4;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace Clouds
+namespace Clouds.GLWrappers
 {
     public class ComputeShader
     {
