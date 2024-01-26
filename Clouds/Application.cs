@@ -8,7 +8,12 @@ namespace Clouds
     public class Application : Window
     {
         private GLWrappers.Program program;
+        private GLWrappers.ComputeShader computeShader;
         private int vaoId;
+        private int Shape3DTexHandle;
+        private int Detail3DTexHandle;
+        private const int Shape3DTexSize = 128;
+        private const int Detail3DTexSize = 128;
         
         private Vector2i windowSize = defaultWindowSize;
         private System.Numerics.Vector3 cameraPosition = new(5.0f, 2.0f, 5.0f);
@@ -18,7 +23,7 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
         private float cloudsBoxHeight = 2.0f;
-
+        private Vector4 shapeSettings = new Vector4(1f,1f, 1f, 1f); 
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -54,6 +59,9 @@ namespace Clouds
             program = new(vertexShader, fragmentShader);
             
             program.SetVec3("cameraPos", new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z));
+
+            computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
+
             SetCloudBoxUniforms();
             SetViewMatrix();
             SetProjectionMatrix();
@@ -77,6 +85,39 @@ namespace Clouds
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
             program.SetInt("cloudsTexture", cloudsTextureUnit);
+        }
+
+        private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
+        {
+            int TexUnit = 1;      // 1 becouse first texture is used inside SetupTexture()
+
+            int Shape3DTexHandle = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Shape3DTexSize * Shape3DTexSize* Shape3DTexSize).ToArray());
+
+            TexUnit++;
+
+            int Detail3DTexHandle = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Detail3DTexSize * Detail3DTexSize * Detail3DTexSize).ToArray());
         }
 
         // TODO: decide if byte type is the best
