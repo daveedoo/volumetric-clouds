@@ -128,6 +128,23 @@ namespace Clouds
             return (Enumerable.Repeat<byte>(50, 4 * texSize * texSize).ToArray(), texSize);
         }
 
+        private void GeneratePerlinTextures()
+        {
+            GL.BindImageTexture(1, Shape3DTexHandle, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            GL.ActiveTexture(TextureUnit.Texture1);
+            GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
+
+            GL.BindImageTexture(2, Detail3DTexHandle, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            GL.ActiveTexture(TextureUnit.Texture2);
+            GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
+
+            computeShader.Use();
+            GL.DispatchCompute(32,32,1);
+
+            // make sure writing to image has finished before read
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+        }
+
         private void SetCloudBoxUniforms()
         {
             program.SetVec3("cloudsBoxCenter", new Vector3(cloudsBoxCenter.X, cloudsBoxCenter.Y, cloudsBoxCenter.Z));
