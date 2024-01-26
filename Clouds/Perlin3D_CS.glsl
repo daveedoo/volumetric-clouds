@@ -4,6 +4,7 @@ layout (local_size_x = 10, local_size_y =10, local_size_z=1) in;
 
 // now it's only shape, later detail be added. 
 layout(rgba32f, binding=0) uniform image3D shape;
+uniform vec4 shapeSize;
 
 // code from shadertoy: https://www.shadertoy.com/view/wsX3D7
 
