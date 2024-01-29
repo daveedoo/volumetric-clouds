@@ -23,8 +23,8 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
         private float cloudsBoxHeight = 2.0f;
-        private Vector4 shapeSettings = new Vector4(100f,50f, 25f, 5f);
-        private Vector4 detailSettings = new Vector4(100f, 50f, 25f, 5f);
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(100f,50f, 25f, 5f);
+        private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(100f, 50f, 25f, 5f);
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -140,8 +140,10 @@ namespace Clouds
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
             computeShader.Use();
-            computeShader.SetVec4("shapeSettings", shapeSettings);
-            computeShader.SetVec4("detailSettings", detailSettings);
+
+            // OpenTK use Vector4 from OpenTK.Mathematics and ImGUI need Vector4 from System.Numerics
+            computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
+            computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
             GL.DispatchCompute(32,32,1);
 
             // make sure writing to image has finished before read
@@ -213,6 +215,18 @@ namespace Clouds
                 if (ImGui.DragFloat("Height", ref cloudsBoxHeight, 0.01f, 0.1f, float.MaxValue))
                 {
                     SetCloudBoxUniforms();
+                }
+                ImGui.TreePop();
+            }
+            if(ImGui.TreeNodeEx("Texture generation", ImGuiTreeNodeFlags.DefaultOpen))  
+            {
+                if(ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
                 }
                 ImGui.TreePop();
             }
