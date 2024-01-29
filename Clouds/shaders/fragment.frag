@@ -1,4 +1,4 @@
-#version 330 core
+#version 460 core
 in vec3 rayDir;
 out vec4 FragColor;
 
@@ -10,6 +10,12 @@ uniform float cloudsBoxHeight;
 
 uniform sampler2D cloudsTexture;
 
+// Todo: Check if bindings are correct (there are set up every time inside GeneratePerlinTextures() function)
+layout(rgba32f, binding=1) uniform image3D shape;
+layout(rgba32f, binding=2) uniform image3D detail;
+
+uniform vec2 shapeOffset;
+uniform vec2 detailOffset;
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)

@@ -2,9 +2,17 @@
 using ImGuiNET;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
 
 namespace Clouds
 {
+    struct AnimationSettings
+    {
+        public System.Numerics.Vector2 ShapeOffset;
+        public System.Numerics.Vector2 DetailOffset;
+        public System.Numerics.Vector2 ShapeSpeed;
+        public System.Numerics.Vector2 DetailSpeed;
+    }
     public class Application : Window
     {
         private GLWrappers.Program program;
@@ -25,6 +33,8 @@ namespace Clouds
         private float cloudsBoxHeight = 2.0f;
         private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(100f,50f, 25f, 5f);
         private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(100f, 50f, 25f, 5f);
+
+        AnimationSettings animation_settings = new AnimationSettings();
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -131,11 +141,12 @@ namespace Clouds
 
         private void GeneratePerlinTextures()
         {
-            GL.BindImageTexture(1, Shape3DTexHandle, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            // https://stackoverflow.com/questions/45282300/writing-to-an-empty-3d-texture-in-a-compute-shader?fbclid=IwAR2Bk9P__lQ4EDLkbbFIvU_zauYKAsd1HFl6ZOQO5z8NzOoT9716FByflEs - layered should be true in BindImageTexture function?
+            GL.BindImageTexture(1, Shape3DTexHandle, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             GL.ActiveTexture(TextureUnit.Texture1);
             GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
 
-            GL.BindImageTexture(2, Detail3DTexHandle, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            GL.BindImageTexture(2, Detail3DTexHandle, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
             GL.ActiveTexture(TextureUnit.Texture2);
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
@@ -148,6 +159,24 @@ namespace Clouds
 
             // make sure writing to image has finished before read
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+        }
+
+
+        // Here simulation of animation is gonna be calculated depending on actual frame time (and buffers gonna be updated)
+        protected override void OnUpdateFrame(FrameEventArgs args)
+        {
+            base.OnUpdateFrame(args);
+            var time = args.Time;
+            //UpdateAnimation((float)time);
+        }
+
+        private void UpdateAnimation(float dt)
+        {
+            animation_settings.ShapeOffset += animation_settings.ShapeSpeed * (new System.Numerics.Vector2(dt,dt));
+            animation_settings.DetailOffset += animation_settings.DetailSpeed * (new System.Numerics.Vector2(dt,dt));
+
+            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X,animation_settings.ShapeOffset.Y) );
+            program.SetVec2("detailOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
         }
 
         private void SetCloudBoxUniforms()
@@ -228,6 +257,12 @@ namespace Clouds
                 {
                     GeneratePerlinTextures();
                 }
+                ImGui.TreePop();
+            }
+            if(ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
+                ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
                 ImGui.TreePop();
             }
             ImGui.End();
