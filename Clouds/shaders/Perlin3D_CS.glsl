@@ -17,7 +17,7 @@ float modValue = 512.0;
 float permuteX(float x)
 {
 	float t = ((x*67.0)+71.0)*x;
-	return mod(t,modValue)
+	return mod(t,modValue);
 }
 
 float permuteY(float x)
@@ -189,9 +189,9 @@ void main()
 {
     // there are gonna be diffrent work groups starting x,y from 0 to 31 and for z only 0
 
-	int x = gl_GlobalInvocationID.x;
-	int y = gl_GlobalInvocationID.y;
-	int z = gl_GlobalInvocationID.z;
+	uint x = gl_GlobalInvocationID.x;
+	uint y = gl_GlobalInvocationID.y;
+	uint z = gl_GlobalInvocationID.z;
 
     // texture size's are 128x128x128 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
     while(x<128)
@@ -205,7 +205,7 @@ void main()
                 float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
                 float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
                 vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, (a+1f)*0.5f);
-                imageStore(shape,vec3(x,y,z),res);
+                imageStore(shape,ivec3(x,y,z),res);
 
                 z +=1;
             }
@@ -226,7 +226,7 @@ void main()
         float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
         float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
         vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, 1f);
-        imageStore(shape,vec3(x,y,z),res);
+        imageStore(detail,ivec3(x,y,z),res);
         z+=1;
     }
 
