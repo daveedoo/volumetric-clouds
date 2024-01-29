@@ -1,10 +1,13 @@
-﻿#version 330 core
+﻿#version 460 core
 
-layout (local_size_x = 10, local_size_y =10, local_size_z=1) in;
+layout (local_size_x = 32, local_size_y =32, local_size_z=1) in;
 
-// now it's only shape, later detail be added. 
-layout(rgba32f, binding=0) uniform image3D shape;
-uniform vec4 shapeSize;
+
+layout(rgba32f, binding=1) uniform image3D shape;
+layout(rgba32f, binding=2) uniform image3D detail;
+
+uniform vec4 shapeSettings;
+uniform vec4 detailSettings;
 
 // code from shadertoy: https://www.shadertoy.com/view/wsX3D7
 
@@ -184,8 +187,47 @@ float perlinNoise(vec3 c)
 
 void main()
 {
-	vec3 texelCoord = vec3(gl_GlobalInvocationID.xyz);
-    float value = perlinNoise(texelCoord);
+    // there are gonna be diffrent work groups starting x,y from 0 to 31 and for z only 0
 
-	imageStore(shape,texelCoord,value);
+	int x = gl_GlobalInvocationID.x;
+	int y = gl_GlobalInvocationID.y;
+	int z = gl_GlobalInvocationID.z;
+
+    // texture size's are 128x128x128 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
+    while(x<128)
+    {
+        while(y<128)
+        {
+            while(z<128)
+            {
+                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
+                float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
+                float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
+                float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
+                vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, (a+1f)*0.5f);
+                imageStore(shape,vec3(x,y,z),res);
+
+                z +=1;
+            }
+            z = gl_GlobalInvocationID.z;
+            y +=32;     
+        }
+        y = gl_GlobalInvocationID.y;
+        x +=32;
+    }
+
+    x = gl_GlobalInvocationID.x;
+    y = gl_GlobalInvocationID.y;
+    z = gl_GlobalInvocationID.z;
+
+    while(z<32)
+    {
+        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
+        float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
+        float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
+        vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, 1f);
+        imageStore(shape,vec3(x,y,z),res);
+        z+=1;
+    }
+
 }

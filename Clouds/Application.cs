@@ -23,7 +23,8 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
         private float cloudsBoxHeight = 2.0f;
-        private Vector4 shapeSettings = new Vector4(1f,1f, 1f, 1f); 
+        private Vector4 shapeSettings = new Vector4(100f,50f, 25f, 5f);
+        private Vector4 detailSettings = new Vector4(100f, 50f, 25f, 5f);
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -102,7 +103,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
-            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Shape3DTexSize * Shape3DTexSize* Shape3DTexSize).ToArray());
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Shape3DTexSize * Shape3DTexSize* Shape3DTexSize).ToArray());
 
             TexUnit++;
 
@@ -117,7 +118,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
-            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Detail3DTexSize * Detail3DTexSize * Detail3DTexSize).ToArray());
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Detail3DTexSize * Detail3DTexSize * Detail3DTexSize).ToArray());
         }
 
         // TODO: decide if byte type is the best
@@ -139,6 +140,8 @@ namespace Clouds
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
             computeShader.Use();
+            computeShader.SetVec4("shapeSettings", shapeSettings);
+            computeShader.SetVec4("detailSettings", detailSettings);
             GL.DispatchCompute(32,32,1);
 
             // make sure writing to image has finished before read
