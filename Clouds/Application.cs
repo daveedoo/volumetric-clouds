@@ -2,7 +2,9 @@
 using ImGuiNET;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
+using System.Runtime.CompilerServices;
 using OpenTK.Windowing.Common;
+using System.Threading.Channels;
 
 namespace Clouds
 {
@@ -20,8 +22,8 @@ namespace Clouds
         private int vaoId;
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
-        private const int Shape3DTexSize = 128;
-        private const int Detail3DTexSize = 128;
+        private const int Shape3DTexSize = 32;
+        private const int Detail3DTexSize = 32;
         
         private Vector2i windowSize = defaultWindowSize;
         private System.Numerics.Vector3 cameraPosition = new(5.0f, 2.0f, 5.0f);
@@ -43,7 +45,8 @@ namespace Clouds
 
             SetupShaders();
             SetupVAO();
-            SetupTexture();
+            SetupTexture(); 
+            SetupPerlinGeneratedTextures();
         }
 
         private void SetupVAO()
@@ -65,8 +68,8 @@ namespace Clouds
 
         private void SetupShaders()
         {
-            using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.vert");
-            using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.frag");
+            using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.glsl");
+            using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
             
             program.SetVec3("cameraPos", new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z));
@@ -113,8 +116,8 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
-            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Shape3DTexSize * Shape3DTexSize* Shape3DTexSize).ToArray());
-
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
+            program.SetInt("shapeTexture", TexUnit);
             TexUnit++;
 
             int Detail3DTexHandle = GL.GenTexture();
@@ -128,13 +131,22 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
-            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, Enumerable.Repeat<byte>(0, 4 * Detail3DTexSize * Detail3DTexSize * Detail3DTexSize).ToArray());
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
+            program.SetInt("detailsTexture", TexUnit);
+        }
+
+        private byte[] GenerateRandom3DBytes(int arraySize)
+        {
+            var rand = new Random();
+            var res = new byte[4 * (int)Math.Pow(arraySize, 3)];
+            rand.NextBytes(res);
+            return res;
         }
 
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = 512;
+            int texSize = 128;
             // mock
             return (Enumerable.Repeat<byte>(50, 4 * texSize * texSize).ToArray(), texSize);
         }
@@ -176,7 +188,7 @@ namespace Clouds
             animation_settings.DetailOffset += animation_settings.DetailSpeed * (new System.Numerics.Vector2(dt,dt));
 
             program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X,animation_settings.ShapeOffset.Y) );
-            program.SetVec2("detailOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
+            program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
         }
 
         private void SetCloudBoxUniforms()
