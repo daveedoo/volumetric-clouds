@@ -204,7 +204,7 @@ void main()
                 float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
                 float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
                 float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
-                vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, (a+1f)*0.5f);
+                vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, (a+1.0f)*0.5f);
                 imageStore(shape,ivec3(x,y,z),res);
 
                 z +=1;
@@ -225,7 +225,7 @@ void main()
         float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
         float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
         float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
-        vec4 res = vec4( (r+1f)*0.5f, (g+1f)*0.5f, (b+1f)*0.5f, 1f);
+        vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, 1.0f);
         imageStore(detail,ivec3(x,y,z),res);
         z+=1;
     }
