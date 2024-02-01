@@ -36,6 +36,9 @@ namespace Clouds
         private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(100f,50f, 25f, 5f);
         private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(100f, 50f, 25f, 5f);
 
+        private float globalCoverage = 0.5f;
+        private float globalDensity = 0.5f;
+
         AnimationSettings animation_settings = new AnimationSettings();
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
@@ -77,6 +80,7 @@ namespace Clouds
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
             SetCloudBoxUniforms();
+            SetGlobalUniforms();
             SetViewMatrix();
             SetProjectionMatrix();
         }
@@ -179,15 +183,21 @@ namespace Clouds
         {
             base.OnUpdateFrame(args);
             var time = args.Time;
-            //UpdateAnimation((float)time);
+            UpdateAnimation((float)time);
         }
 
+        float accumulatedTime = 0;
         private void UpdateAnimation(float dt)
         {
-            animation_settings.ShapeOffset += animation_settings.ShapeSpeed * (new System.Numerics.Vector2(dt,dt));
-            animation_settings.DetailOffset += animation_settings.DetailSpeed * (new System.Numerics.Vector2(dt,dt));
+            dt /= 100;
+            accumulatedTime += dt;
+            accumulatedTime = accumulatedTime - (int)accumulatedTime;
 
-            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X,animation_settings.ShapeOffset.Y) );
+
+            animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
+            animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
+
+            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y) );
             program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
         }
 
@@ -197,6 +207,13 @@ namespace Clouds
             program.SetFloat("cloudsBoxSideLength", cloudsBoxSideLength);
             program.SetFloat("cloudsBoxHeight", cloudsBoxHeight);
         }
+
+        private void SetGlobalUniforms()
+        {
+            program.SetFloat("globalCoverage", globalCoverage);
+            program.SetFloat("globalDensity", globalDensity);
+        }
+
         private void SetViewMatrix()
         {
             Matrix4 viewMtx = Matrix4.LookAt(
@@ -214,6 +231,7 @@ namespace Clouds
         protected override void RenderScene()
         {
             program.Use();
+
 
             GL.BindVertexArray(vaoId);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
@@ -275,6 +293,19 @@ namespace Clouds
             {
                 ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
                 ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Glonal", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragFloat("Global Coverage", ref globalCoverage, 0.01f, 0.0f, 1.0f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Global Density", ref globalDensity, 0.01f, 0.0f, 0.5f))
+                {
+                    SetGlobalUniforms();
+                }
                 ImGui.TreePop();
             }
             ImGui.End();

@@ -194,11 +194,11 @@ void main()
 	uint z = gl_GlobalInvocationID.z;
 
     // texture size's are 128x128x128 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
-    while(x<128)
+    while(x<32)
     {
-        while(y<128)
+        while(y<32)
         {
-            while(z<128)
+            while(z<32)
             {
                 float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
                 float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));

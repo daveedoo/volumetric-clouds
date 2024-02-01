@@ -8,8 +8,11 @@ uniform vec3 cloudsBoxCenter;
 uniform float cloudsBoxSideLength;
 uniform float cloudsBoxHeight;
 
-uniform float shapeOffset;
-uniform float detailsOffset;
+uniform vec2 shapeOffset;
+uniform vec2 detailsOffset;
+
+uniform float globalCoverage;
+uniform float globalDensity;
 
 uniform sampler2D cloudsTexture;
 
@@ -60,55 +63,52 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
-    //TODO: move it to uniforms settable by imgui
-    float globalCoverage = 0.8f;
-    float globalDensity = 1.0f;
-
-    vec4 cloud = texture(cloudsTexture, texCoords);
-    float density = cloud.r;
-
-    vec4 weather = vec4(0.5f); // TODO: Create weather texture, and sample this value from it
+    vec4 weather = texture(cloudsTexture, texCoords);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
     float WMc = max(weather.r, SAT(globalCoverage - 0.5f) * weather.g * 2);
 
     //b channel stance for height of cloud (3.1.3.1)
     float wh = weather.b; 
-    float ph = density; // TODO: Take it from cloudTexture, channel z
+    float ph = 1 - height; 
     float SRb = SAT(R(ph, 0.0f, 0.07f, 0.0f, 1.0f));
     float SRt = SAT(R(ph, weather.b * 0.2f, weather.b, 1.0f, 0.0f));
     float SA = SRb * SRt;
 
     //alfa channel stance for density of cloud (3.1.3.2)
     float wd = weather.a;
-    float DRb = ph * SAT(R(ph, 0.0f, 0.15f, 0.0f, 1.0f));
-    float DRt = ph * SAT(R(ph, 0.9f, 1.0f, 1.0f, 0.0f));
+    float daph = height;
+    float DRb = daph * SAT(R(daph, 0.0f, 0.15f, 0.0f, 1.0f));
+    float DRt = daph * SAT(R(daph, 0.9f, 1.0f, 1.0f, 0.0f));
     float DA = globalDensity * DRb * DRt * wd * 2;
 
     //
     // Shape and detail noise (3.1.4)
     //
-    vec4 sn = texture(shapeTexture, vec3(texCoords.xy + shapeOffset, 0)); // todo add shapeOfffset to animate cloud
-    //vec4 sn = vec4(1.0f, 0.5f, 0.7f, 0.9f);
+    vec4 sn = texture(shapeTexture, vec3(texCoords + shapeOffset, 0)); 
 
     float SNsample = R(sn.r, (sn.g * 0.625f + sn.b * 0.25f + sn.a * 0.12f) - 1.0f, 1.0f, 0.0f, 1.0f);
     float SN = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f)) * DA;
     
     //detail noise
-    vec4 dn = texture(detailsTexture, vec3(texCoords.xy + detailsOffset, 0));// todo add detailOffset to animate cloud
-    //vec4 dn = vec4(1.0f, 0.8f, 0.6f, 1.0f);
+    vec4 dn = texture(detailsTexture, vec3(texCoords + detailsOffset, 0));
+
     float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f; 
     float DNmod = 0.35f * exp(-globalCoverage * 0.75f) * L(DNfbm, 1 - DNfbm, SAT(ph * 5));
-    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1, 0, 1));
+    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f));
     
-    //(shape noise + weather map + alter height) + detail noise + alter density
-    return SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
+    // final result taking everything into consideration
+    float result = SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
+    //return result;
+    // result giving good effects, but it is not final one
+    return SNsample * SA * DA * 10;
 }
 
 
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
 {
     float RAYMARCH_STEP = 0.01f;
+    //float RAYMARCH_STEP = 1.0f;
     float density = 0.0f;
     vec3 samplePoint = cameraPos + dstToBox * rayDir;
     for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
@@ -119,9 +119,7 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
         vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
         float height = boxPoint.y / cloudsBoxHeight + 0.5f;
 
-        float cos1 = texture(cloudsTexture, texCoords.xy).r;//getCloudValue(texCoords, height);
-        float cos2 = texture(detailsTexture, vec3(texCoords.xy, 1.0f)).r;//getCloudValue(texCoords, height);
-        float cloud = texture(shapeTexture, vec3(texCoords.xy, 1.0f)).g;//getCloudValue(texCoords, height);
+        float cloud = getCloudValue(texCoords, height);
 
         // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
         density += RAYMARCH_STEP * cloud;
