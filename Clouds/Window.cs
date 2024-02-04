@@ -1,4 +1,5 @@
-﻿using ImGuiNET;
+﻿using Clouds.GLWrappers;
+using ImGuiNET;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -43,6 +44,7 @@ namespace Clouds
             GL.ClearColor(clearColor);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
+            HandleMouseAndKeyboardInput(e);
             RenderScene();
 
             RenderGUI();
@@ -53,6 +55,7 @@ namespace Clouds
         }
 
         protected abstract void RenderScene();
+        protected abstract void HandleMouseAndKeyboardInput(FrameEventArgs e);
         protected abstract void RenderGUI();
 
         protected override void OnTextInput(TextInputEventArgs e)
