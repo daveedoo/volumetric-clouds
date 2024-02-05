@@ -183,6 +183,59 @@ float perlinNoise(vec3 c)
 }
 
 
+    // voronoi noise generator for tests
+
+    float hash(float x)
+    {
+        return fract(x+1.3215 * 1.8152);
+    }
+
+    float hash3(vec3 a)
+    {
+        return fract((hash(a.z * 42.8883) + hash(a.y * 36.9125) + hash(a.x * 65.4321)) * 291.1257);
+    }
+
+    vec3 rehash3(float x)
+    {
+        return vec3(hash(((x + 0.5283) * 59.3829) * 274.3487), hash(((x + 0.8192) * 83.6621) * 345.3871), hash(((x + 0.2157f) * 36.6521f) * 458.3971f));
+    }
+
+    float sqr(float x)
+    { 
+        return x * x;
+    }
+
+    float fastdist(vec3 a, vec3 b)
+    {
+        return sqr(b.x - a.x) + sqr(b.y - a.y) + sqr(b.z - a.z);
+    }
+
+    vec2 eval(float x, float y, float z)
+    {
+        vec4 p[27];
+        for (int _x = -1; _x <= 1; _x++)
+            for (int _y = -1; _y <= 1; _y++)
+                for (int _z = -1; _z <= 1; _z++)
+                {
+                    vec3 _p = vec3(floor(x), floor(y), floor(z)) + vec3(_x, _y, _z);
+                    float h = hash3(_p);
+                    p[(_x + 1) + ((_y + 1) * 3) + ((_z + 1) * 3 * 3)] = vec4((rehash3(h) + _p).xyz, h);
+                }
+        float m = 9999.9999, w = 0.0;
+        for (int i = 0; i < 27; i++)
+        {
+            float d = fastdist(vec3(x, y, z), p[i].xyz);
+            if (d < m)
+            {
+                m = d;
+                w = p[i].w;
+            }
+        }
+        return vec2(m, w);
+    }
+
+    // end of voronoi noise generator part
+
 
 
 void main()
@@ -200,11 +253,21 @@ void main()
         {
             while(z<32)
             {
-                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
-                float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
-                float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
-                float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
-                vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, (a+1.0f)*0.5f);
+                  // Option 1: Generate noise using perling generator
+//                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
+//                float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
+//                float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
+//                float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
+//                vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, (a+1.0f)*0.5f);
+                
+                // Option 2: Generate noise using voronoi generator
+                vec2 r = eval(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x);
+                vec2 g = eval(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y);
+                vec2 b = eval(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z);
+                vec2 a = eval(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w);
+                vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), (1.0f - sqrt(a.x)));
+                
+                
                 imageStore(shape,ivec3(x,y,z),res);
 
                 z +=1;
@@ -222,10 +285,19 @@ void main()
 
     while(z<32)
     {
-        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
-        float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
-        float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
-        vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, 1.0f);
+        // Option 1
+//        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
+//        float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
+//        float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
+//        vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, 1.0f);
+
+        // Option 2
+        vec2 r = eval(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x);
+        vec2 g = eval(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y);
+        vec2 b = eval(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z);
+        vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), 1.0f);
+
+
         imageStore(detail,ivec3(x,y,z),res);
         z+=1;
     }

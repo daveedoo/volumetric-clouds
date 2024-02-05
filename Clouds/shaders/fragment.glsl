@@ -101,7 +101,7 @@ float getCloudValue(vec2 texCoords, float height)
     float result = SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
     //return result;
     // result giving good effects, but it is not final one
-    return SNsample * SA * DA * 10;
+    return result;
 }
 
 
