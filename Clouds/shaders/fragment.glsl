@@ -20,6 +20,11 @@ uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
 //uniform sampler2D weatherTexture;
 
+uniform vec3 lightPos;
+uniform int lightmarchStepCount;
+uniform float transmittance;
+uniform float cloudAbsorption;
+uniform float minLightEnergy;
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
@@ -127,10 +132,35 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
     return density;
 }
 
+// to use when getCloudValue is fixed
+float lightmarchCloud(vec3 pos)
+{ 
+    vec3 LightDir = normalize(lightPos);
+    // LightDir or 1/LightDir?
+    float dstInBox = testCloudsBoxIntersection(pos, LightDir).y;
 
+    float stepSize = dstInBox/lightmarchStepCount;
+    float totalLightDensity =0;
+
+    for(int i=0;i<lightmarchStepCount;i++)
+    {
+        pos += LightDir*stepSize;
+
+        vec3 boxPoint = cloudsBoxCenter - pos;
+        vec2 texCoords = boxPoint.xz/cloudsBoxSideLength + 0.5f;
+        float h = boxPoint.y/cloudsBoxHeight + 0.5f;
+        float currentDensity = getCloudValue(texCoords,h);
+        totalLightDensity += max(0,currentDensity)*stepSize;
+    }
+
+    float t = exp(-totalLightDensity*cloudAbsorption);
+
+    return minLightEnergy + t*(1-minLightEnergy);
+}
 
 void main()
 {
+    // rayDir or 1/rayDir?
     vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
     float dstToBox = intersection.x;
     float dstInBox = intersection.y;

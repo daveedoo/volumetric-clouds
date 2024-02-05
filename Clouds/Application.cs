@@ -30,6 +30,10 @@ namespace Clouds
         
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
+        private Vector3 lightPos = new(-2.0f,0.0f,5.0f);
+        private int lightmarchStepCount = 20;
+        private float cloudAbsorption = 1.0f;
+        private float minLightEnergy = 0.2f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
@@ -213,6 +217,12 @@ namespace Clouds
         {
             program.SetFloat("globalCoverage", globalCoverage);
             program.SetFloat("globalDensity", globalDensity);
+
+            // Uncomment when lightmarching will be used to change cloud color (will impact result)
+            //program.SetVec3("lightPos", lightPos);
+            //program.SetInt("lightmarchStepCount",lightmarchStepCount);
+            //program.SetFloat("cloudAbsorption", cloudAbsorption);
+            //program.SetFloat("minLightEnergy", minLightEnergy);
         }
 
 
@@ -366,7 +376,7 @@ namespace Clouds
                 ImGui.TreePop();
             }
 
-            if (ImGui.TreeNodeEx("Glonal", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.TreeNodeEx("Global", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat("Global Coverage", ref globalCoverage, 0.01f, 0.0f, 1.0f))
                 {
@@ -378,6 +388,23 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
+
+            if(ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if(ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount))
+                {
+                    SetGlobalUniforms();
+                }
+                if(ImGui.DragFloat("Cloud absorption", ref cloudAbsorption))
+                {
+                    SetGlobalUniforms();
+                }
+                if(ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
+                {
+                    SetGlobalUniforms();
+                }
+            }
+
             ImGui.End();
         }
 
