@@ -2,6 +2,8 @@
 using ImGuiNET;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
+using OpenTK.Windowing.Common;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using System.Runtime.CompilerServices;
 using OpenTK.Windowing.Common;
 using System.Threading.Channels;
@@ -18,6 +20,7 @@ namespace Clouds
     public class Application : Window
     {
         private GLWrappers.Program program;
+        private Camera _camera;
         private GLWrappers.ComputeShader computeShader;
         private int vaoId;
         private int Shape3DTexHandle;
@@ -26,9 +29,7 @@ namespace Clouds
         private const int Detail3DTexSize = 32;
         
         private Vector2i windowSize = defaultWindowSize;
-        private System.Numerics.Vector3 cameraPosition = new(5.0f, 2.0f, 5.0f);
-        private System.Numerics.Vector3 cameraTarget = new(0.0f);
-        private float cameraFOV = 90; // degrees
+        private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
@@ -45,7 +46,9 @@ namespace Clouds
         public Application() : base(defaultWindowSize)
         {
             Title = "Clouds";
-
+            _camera = new Camera(cameraPosition, (float)windowSize.X / windowSize.Y);
+            _camera.Yaw = 180;
+            _camera.Pitch = -10;
             SetupShaders();
             SetupVAO();
             SetupTexture(); 
@@ -75,14 +78,12 @@ namespace Clouds
             using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
             
-            program.SetVec3("cameraPos", new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z));
 
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
+            program.SetVec3("cameraPos", _camera.Position);
             SetCloudBoxUniforms();
             SetGlobalUniforms();
-            SetViewMatrix();
-            SetProjectionMatrix();
         }
 
         private void SetupTexture()
@@ -214,28 +215,97 @@ namespace Clouds
             program.SetFloat("globalDensity", globalDensity);
         }
 
-        private void SetViewMatrix()
-        {
-            Matrix4 viewMtx = Matrix4.LookAt(
-                new Vector3(cameraPosition.X, cameraPosition.Y, cameraPosition.Z),
-                new Vector3(cameraTarget.X, cameraTarget.Y, cameraTarget.Z),
-                Vector3.UnitY);
-            program.SetMat4("viewMtx", viewMtx);
-        }
-        private void SetProjectionMatrix()
-        {
-            Matrix4 projMtx = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(cameraFOV), (float)windowSize.X / windowSize.Y, 1.0f, 100.0f);
-            program.SetMat4("projMtx", projMtx);
-        }
 
         protected override void RenderScene()
         {
             program.Use();
 
 
+            program.SetMat4("viewMtx", _camera.GetViewMatrix());
+            program.SetMat4("projMtx", _camera.GetProjectionMatrix());
+
             GL.BindVertexArray(vaoId);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
+
+
+        private bool _firstMove = true;
+
+        private Vector2 _lastPos;
+
+        private double _time;
+
+        protected override void HandleMouseAndKeyboardInput(FrameEventArgs e)
+        {
+            if (!IsFocused) // Check to see if the window is focused
+            {
+                return;
+            }
+
+            var input = KeyboardState;
+
+            if (input.IsKeyDown(Keys.Escape))
+            {
+                Close();
+            }
+
+            const float cameraSpeed = 30.5f;
+            const float sensitivity = 0.2f;
+
+            if (input.IsKeyDown(Keys.W))
+            {
+                _camera.Position += _camera.Front * cameraSpeed * (float)e.Time; // Forward
+            }
+
+            if (input.IsKeyDown(Keys.S))
+            {
+                _camera.Position -= _camera.Front * cameraSpeed * (float)e.Time; // Backwards
+            }
+            if (input.IsKeyDown(Keys.A))
+            {
+                _camera.Position -= _camera.Right * cameraSpeed * (float)e.Time; // Left
+            }
+            if (input.IsKeyDown(Keys.D))
+            {
+                _camera.Position += _camera.Right * cameraSpeed * (float)e.Time; // Right
+            }
+            if (input.IsKeyDown(Keys.Space))
+            {
+                _camera.Position += _camera.Up * cameraSpeed * (float)e.Time; // Up
+            }
+            if (input.IsKeyDown(Keys.LeftShift))
+            {
+                _camera.Position -= _camera.Up * cameraSpeed * (float)e.Time; // Down
+            }
+
+
+            if (!input.IsKeyDown(Keys.LeftControl))
+            {
+                _firstMove = true;
+                return;
+            }
+
+            // Get the mouse state
+            var mouse = MouseState;
+
+            if (_firstMove) // This bool variable is initially set to true.
+            {
+                _lastPos = new Vector2(mouse.X, mouse.Y);
+                _firstMove = false;
+            }
+            else
+            {
+                // Calculate the offset of the mouse position
+                var deltaX = mouse.X - _lastPos.X;
+                var deltaY = mouse.Y - _lastPos.Y;
+                _lastPos = new Vector2(mouse.X, mouse.Y);
+
+                // Apply the camera pitch and yaw (we clamp the pitch in the camera class)
+                _camera.Yaw += deltaX * sensitivity;
+                _camera.Pitch -= deltaY * sensitivity; // Reversed since y-coordinates range from bottom to top
+            }
+        }
+    
 
         protected override void RenderGUI()
         {
@@ -245,22 +315,22 @@ namespace Clouds
             ImGui.ShowDemoWindow();
 
             ImGui.Begin("-");
-            if (ImGui.TreeNodeEx("Camera", ImGuiTreeNodeFlags.DefaultOpen))
-            {
-                if (ImGui.DragFloat3("Camera Position", ref cameraPosition, 0.01f))
-                {
-                    SetViewMatrix();
-                }
-                if (ImGui.DragFloat3("Camera Target", ref cameraTarget, 0.01f))
-                {
-                    SetViewMatrix();
-                }
-                if (ImGui.DragFloat("Camera FOV", ref cameraFOV, 0.1f, 10.0f, 179.0f, "%.1f", ImGuiSliderFlags.AlwaysClamp))
-                {
-                    SetProjectionMatrix();
-                }
-                ImGui.TreePop();
-            }
+            //if (ImGui.TreeNodeEx("Camera", ImGuiTreeNodeFlags.DefaultOpen))
+            //{
+            //    if (ImGui.DragFloat3("Camera Position", ref camera.Position, 0.01f))
+            //    {
+            //        SetViewMatrix();
+            //    }
+            //    if (ImGui.DragFloat3("Camera Target", ref cameraTarget, 0.01f))
+            //    {
+            //        SetViewMatrix();
+            //    }
+            //    if (ImGui.DragFloat("Camera FOV", ref camera.Fov, 0.1f, 10.0f, 179.0f, "%.1f", ImGuiSliderFlags.AlwaysClamp))
+            //    {
+            //        SetProjectionMatrix();
+            //    }
+            //    ImGui.TreePop();
+            //}
             if (ImGui.TreeNodeEx("Clouds box", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat3("Center", ref cloudsBoxCenter, 0.01f))
