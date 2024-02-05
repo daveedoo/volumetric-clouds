@@ -157,7 +157,7 @@ namespace Clouds
         {
             int texSize = 128;
             // mock
-            return (Enumerable.Repeat<byte>(50, 4 * texSize * texSize).ToArray(), texSize);
+            return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
         }
 
         private void GeneratePerlinTextures()
