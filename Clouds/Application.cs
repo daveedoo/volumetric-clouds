@@ -4,14 +4,29 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using System.Runtime.CompilerServices;
+using OpenTK.Windowing.Common;
+using System.Threading.Channels;
 
 namespace Clouds
 {
+    struct AnimationSettings
+    {
+        public System.Numerics.Vector2 ShapeOffset;
+        public System.Numerics.Vector2 DetailOffset;
+        public System.Numerics.Vector2 ShapeSpeed;
+        public System.Numerics.Vector2 DetailSpeed;
+    }
     public class Application : Window
     {
         private GLWrappers.Program program;
         private Camera _camera;
+        private GLWrappers.ComputeShader computeShader;
         private int vaoId;
+        private int Shape3DTexHandle;
+        private int Detail3DTexHandle;
+        private const int Shape3DTexSize = 32;
+        private const int Detail3DTexSize = 32;
         
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
@@ -19,7 +34,13 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
         private float cloudsBoxHeight = 2.0f;
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(100f,50f, 25f, 5f);
+        private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(100f, 50f, 25f, 5f);
 
+        private float globalCoverage = 0.5f;
+        private float globalDensity = 0.5f;
+
+        AnimationSettings animation_settings = new AnimationSettings();
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -30,7 +51,8 @@ namespace Clouds
             _camera.Pitch = -10;
             SetupShaders();
             SetupVAO();
-            SetupTexture();
+            SetupTexture(); 
+            SetupPerlinGeneratedTextures();
         }
 
         private void SetupVAO()
@@ -52,12 +74,16 @@ namespace Clouds
 
         private void SetupShaders()
         {
-            using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.vert");
-            using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.frag");
+            using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.glsl");
+            using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
             
+
+            computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
+
             program.SetVec3("cameraPos", _camera.Position);
             SetCloudBoxUniforms();
+            SetGlobalUniforms();
         }
 
         private void SetupTexture()
@@ -80,12 +106,100 @@ namespace Clouds
             program.SetInt("cloudsTexture", cloudsTextureUnit);
         }
 
+        private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
+        {
+            int TexUnit = 1;      // 1 becouse first texture is used inside SetupTexture()
+
+            int Shape3DTexHandle = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
+            program.SetInt("shapeTexture", TexUnit);
+            TexUnit++;
+
+            int Detail3DTexHandle = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+
+            GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
+            program.SetInt("detailsTexture", TexUnit);
+        }
+
+        private byte[] GenerateRandom3DBytes(int arraySize)
+        {
+            var rand = new Random();
+            var res = new byte[4 * (int)Math.Pow(arraySize, 3)];
+            rand.NextBytes(res);
+            return res;
+        }
+
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = 512;
+            int texSize = 128;
             // mock
             return (Enumerable.Repeat<byte>(50, 4 * texSize * texSize).ToArray(), texSize);
+        }
+
+        private void GeneratePerlinTextures()
+        {
+            // https://stackoverflow.com/questions/45282300/writing-to-an-empty-3d-texture-in-a-compute-shader?fbclid=IwAR2Bk9P__lQ4EDLkbbFIvU_zauYKAsd1HFl6ZOQO5z8NzOoT9716FByflEs - layered should be true in BindImageTexture function?
+            GL.BindImageTexture(1, Shape3DTexHandle, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            GL.ActiveTexture(TextureUnit.Texture1);
+            GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
+
+            GL.BindImageTexture(2, Detail3DTexHandle, 0, true, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba32f);
+            GL.ActiveTexture(TextureUnit.Texture2);
+            GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
+
+            computeShader.Use();
+
+            // OpenTK use Vector4 from OpenTK.Mathematics and ImGUI need Vector4 from System.Numerics
+            computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
+            computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
+            GL.DispatchCompute(32,32,1);
+
+            // make sure writing to image has finished before read
+            GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
+        }
+
+
+        // Here simulation of animation is gonna be calculated depending on actual frame time (and buffers gonna be updated)
+        protected override void OnUpdateFrame(FrameEventArgs args)
+        {
+            base.OnUpdateFrame(args);
+            var time = args.Time;
+            UpdateAnimation((float)time);
+        }
+
+        float accumulatedTime = 0;
+        private void UpdateAnimation(float dt)
+        {
+            dt /= 100;
+            accumulatedTime += dt;
+            accumulatedTime = accumulatedTime - (int)accumulatedTime;
+
+
+            animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
+            animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
+
+            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y) );
+            program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
         }
 
         private void SetCloudBoxUniforms()
@@ -95,9 +209,17 @@ namespace Clouds
             program.SetFloat("cloudsBoxHeight", cloudsBoxHeight);
         }
 
+        private void SetGlobalUniforms()
+        {
+            program.SetFloat("globalCoverage", globalCoverage);
+            program.SetFloat("globalDensity", globalDensity);
+        }
+
+
         protected override void RenderScene()
         {
             program.Use();
+
 
             program.SetMat4("viewMtx", _camera.GetViewMatrix());
             program.SetMat4("projMtx", _camera.GetProjectionMatrix());
@@ -222,6 +344,37 @@ namespace Clouds
                 if (ImGui.DragFloat("Height", ref cloudsBoxHeight, 0.01f, 0.1f, float.MaxValue))
                 {
                     SetCloudBoxUniforms();
+                }
+                ImGui.TreePop();
+            }
+            if(ImGui.TreeNodeEx("Texture generation", ImGuiTreeNodeFlags.DefaultOpen))  
+            {
+                if(ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                ImGui.TreePop();
+            }
+            if(ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
+                ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Glonal", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragFloat("Global Coverage", ref globalCoverage, 0.01f, 0.0f, 1.0f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Global Density", ref globalDensity, 0.01f, 0.0f, 0.5f))
+                {
+                    SetGlobalUniforms();
                 }
                 ImGui.TreePop();
             }
