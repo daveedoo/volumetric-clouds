@@ -85,7 +85,7 @@ namespace Clouds
 
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
-            program.SetVec3("cameraPos", _camera.Position);
+            SetCameraPosition();
             SetCloudBoxUniforms();
             SetGlobalUniforms();
         }
@@ -206,6 +206,10 @@ namespace Clouds
             program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
         }
 
+        private void SetCameraPosition()
+        {
+            program.SetVec3("cameraPos", _camera.Position);
+        }
         private void SetCloudBoxUniforms()
         {
             program.SetVec3("cloudsBoxCenter", new Vector3(cloudsBoxCenter.X, cloudsBoxCenter.Y, cloudsBoxCenter.Z));
@@ -265,27 +269,33 @@ namespace Clouds
             if (input.IsKeyDown(Keys.W))
             {
                 _camera.Position += _camera.Front * cameraSpeed * (float)e.Time; // Forward
+                SetCameraPosition();
             }
 
             if (input.IsKeyDown(Keys.S))
             {
                 _camera.Position -= _camera.Front * cameraSpeed * (float)e.Time; // Backwards
+                SetCameraPosition();
             }
             if (input.IsKeyDown(Keys.A))
             {
                 _camera.Position -= _camera.Right * cameraSpeed * (float)e.Time; // Left
+                SetCameraPosition();
             }
             if (input.IsKeyDown(Keys.D))
             {
                 _camera.Position += _camera.Right * cameraSpeed * (float)e.Time; // Right
+                SetCameraPosition();
             }
             if (input.IsKeyDown(Keys.Space))
             {
                 _camera.Position += _camera.Up * cameraSpeed * (float)e.Time; // Up
+                SetCameraPosition();
             }
             if (input.IsKeyDown(Keys.LeftShift))
             {
                 _camera.Position -= _camera.Up * cameraSpeed * (float)e.Time; // Down
+                SetCameraPosition();
             }
 
 
