@@ -222,6 +222,8 @@ namespace Clouds
             program.SetFloat("globalCoverage", globalCoverage);
             program.SetFloat("globalDensity", globalDensity);
 
+            program.SetColor4("clearColor", clearColor);
+
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
             //program.SetVec3("lightPos", lightPos);
             //program.SetInt("lightmarchStepCount",lightmarchStepCount);

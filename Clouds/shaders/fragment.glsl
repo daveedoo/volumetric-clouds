@@ -13,6 +13,7 @@ uniform vec2 detailsOffset;
 
 uniform float globalCoverage;
 uniform float globalDensity;
+uniform vec4 clearColor;
 
 uniform sampler2D cloudsTexture;
 
@@ -172,5 +173,13 @@ void main()
     // ray-marching loop
     float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
 
-    FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
+    float densityEps = 0.001f;
+    if (rayMarchedDensity < densityEps)
+    {
+      FragColor = clearColor;
+    }
+    else
+    {
+      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
+    }
 }

@@ -10,7 +10,7 @@ namespace Clouds
     public abstract class Window : GameWindow
     {
         ImGuiController _controller;
-        Color4 clearColor = new(0, 32, 48, 255);
+        protected Color4 clearColor = new(0, 32, 48, 255);
 
         public Window(Vector2i clientSize) : base(GameWindowSettings.Default, new NativeWindowSettings() { ClientSize = clientSize, APIVersion = new Version(4, 6) })
         { }

@@ -83,6 +83,14 @@ namespace Clouds.GLWrappers
             });
         }
 
+        public void SetColor4(string uniformName, Color4 value)
+        {
+            ExecuteUniformVariableOperation(uniformName, (int location) =>
+            {
+                GL.Uniform4(location, value);
+            });
+        }
+
         public void SetMat4(string uniformName, Matrix4 value)
         {
             ExecuteUniformVariableOperation(uniformName, (int location) =>
