@@ -369,7 +369,29 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
-            if(ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.TreeNodeEx("Color of sky", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                var backgroundColor = new System.Numerics.Vector3(clearColor.R, clearColor.G, clearColor.B);
+                if (ImGui.ColorPicker3("Background color", ref backgroundColor))
+                {
+                    clearColor.R = backgroundColor[0];
+                    clearColor.G = backgroundColor[1];
+                    clearColor.B = backgroundColor[2];
+                    SetGlobalUniforms();
+                }
+
+
+                if (ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                ImGui.TreePop();
+            }
+            if (ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
                 ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
