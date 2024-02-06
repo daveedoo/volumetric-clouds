@@ -38,8 +38,8 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
         private float cloudsBoxHeight = 2.0f;
-        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(100f,50f, 25f, 5f);
-        private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(100f, 50f, 25f, 5f);
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(10f,5f, 4f, 2f);
+        private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(4f, 3f, 2f, 2f);
 
         private float globalCoverage = 0.5f;
         private float globalDensity = 0.5f;
@@ -57,6 +57,7 @@ namespace Clouds
             SetupVAO();
             SetupTexture(); 
             SetupPerlinGeneratedTextures();
+            GeneratePerlinTextures();
         }
 
         private void SetupVAO()

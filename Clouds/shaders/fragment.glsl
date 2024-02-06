@@ -69,7 +69,7 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
-    height = 1 - height;
+    //height = 1 - height;
     vec4 weather = texture(cloudsTexture, texCoords);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
