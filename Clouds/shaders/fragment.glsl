@@ -19,7 +19,7 @@ uniform sampler2D cloudsTexture;
 
 uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
-//uniform sampler2D weatherTexture;
+uniform sampler2D blueNoiseTexture;
 
 uniform vec3 lightPos;
 uniform int lightmarchStepCount;
@@ -148,6 +148,13 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
 
     // TODO: Blue noise offset of samplePoint
     vec3 samplePoint = cameraPos + dstToBox * rayDir;
+
+    // texture is smaller that the render target, multiply by 5 to wrap the tex
+    vec3 boxPoint = cloudsBoxCenter - samplePoint;
+    vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
+
+    vec4 blueNoiseValue = texture(blueNoiseTexture, texCoords);
+    samplePoint += rayDir * RAYMARCH_STEP * 4 * (blueNoiseValue.r - 0.5);
 
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
