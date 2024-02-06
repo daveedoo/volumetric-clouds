@@ -30,10 +30,12 @@ namespace Clouds
         
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
-        private Vector3 lightPos = new(-2.0f,0.0f,5.0f);
+        private Vector3 lightPos = new(1.0f,0.2f,0.0f);
         private int lightmarchStepCount = 20;
         private float cloudAbsorption = 1.0f;
+        private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;
+        private float densityEps = 0.01f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 2.0f;
@@ -225,11 +227,13 @@ namespace Clouds
 
             program.SetColor4("clearColor", clearColor);
 
+            program.SetFloat("densityEps", densityEps);
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
             //program.SetVec3("lightPos", lightPos);
             //program.SetInt("lightmarchStepCount",lightmarchStepCount);
             //program.SetFloat("cloudAbsorption", cloudAbsorption);
             //program.SetFloat("minLightEnergy", minLightEnergy);
+            //program.SetFloat("sunAbsorption", sunAbsorption);
         }
 
 
@@ -412,7 +416,15 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
+                if(ImGui.DragFloat("Sun absorption", ref sunAbsorption))
+                {
+                    SetGlobalUniforms();
+                }
                 if(ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Density epsilon", ref densityEps))
                 {
                     SetGlobalUniforms();
                 }

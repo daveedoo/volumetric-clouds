@@ -25,7 +25,9 @@ uniform vec3 lightPos;
 uniform int lightmarchStepCount;
 uniform float transmittance;
 uniform float cloudAbsorption;
+uniform float sunAbsorption;
 uniform float minLightEnergy;
+uniform float densityEps;
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
@@ -115,7 +117,7 @@ float getCloudValue(vec2 texCoords, float height)
 float lightmarchCloud(vec3 pos)
 { 
     vec3 LightDir = normalize(lightPos);
-    // LightDir or 1/LightDir?
+
     float dstInBox = testCloudsBoxIntersection(pos, LightDir).y;
 
     float stepSize = dstInBox/lightmarchStepCount;
@@ -129,10 +131,11 @@ float lightmarchCloud(vec3 pos)
         vec2 texCoords = boxPoint.xz/cloudsBoxSideLength + 0.5f;
         float h = boxPoint.y/cloudsBoxHeight + 0.5f;
         float currentDensity = getCloudValue(texCoords,h);
+
         totalLightDensity += max(0,currentDensity)*stepSize;
     }
 
-    float t = exp(-totalLightDensity*cloudAbsorption);
+    float t = exp(-totalLightDensity*sunAbsorption);
 
     return minLightEnergy + t*(1-minLightEnergy);
 }
@@ -142,21 +145,30 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
     float RAYMARCH_STEP = 0.01f;
     //float RAYMARCH_STEP = 1.0f;
     float density = 0.0f;
+
+    // TODO: Blue noise offset of samplePoint
     vec3 samplePoint = cameraPos + dstToBox * rayDir;
+
+    float lightEnergy = 0.0f;
+    float transmittance1 = 1.0f;
+
     for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
     {
         samplePoint += RAYMARCH_STEP * rayDir;
-
         vec3 boxPoint = cloudsBoxCenter - samplePoint;
         vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
         float height = boxPoint.y / cloudsBoxHeight + 0.5f;
+        float pointDensity = getCloudValue(texCoords, height);
 
-        float cloud = getCloudValue(texCoords, height);
-
-        // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
-        density += RAYMARCH_STEP * cloud * lightmarchCloud(samplePoint);
+        if(pointDensity>densityEps)
+        {
+            // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
+            // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
+            lightEnergy += RAYMARCH_STEP * pointDensity;// * lightmarchCloud(samplePoint) * transmittance1;
+            //transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
+        }    
     }
-    return density;
+    return lightEnergy;
 }
 
 
@@ -174,7 +186,7 @@ void main()
 
     // ray-marching loop
     float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
-
+    //FragColor = clearColor + rayMarchedDensity;
     float densityEps = 0.001f;
     if (rayMarchedDensity < densityEps)
     {
