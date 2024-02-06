@@ -195,13 +195,11 @@ namespace Clouds
         float accumulatedTime = 0;
         private void UpdateAnimation(float dt)
         {
-            dt /= 100;
-            accumulatedTime += dt;
-            accumulatedTime = accumulatedTime - (int)accumulatedTime;
+            accumulatedTime += dt / 100;
+            var currTime = accumulatedTime - (int)accumulatedTime;
 
-
-            animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
-            animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(accumulatedTime, accumulatedTime));
+            animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(currTime, currTime));
+            animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(currTime, currTime));
 
             program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y) );
             program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
@@ -259,9 +257,10 @@ namespace Clouds
                 return;
             }
 
-            var input = KeyboardState;
+            var keyboardInput = KeyboardState;
+            var mouseInput = MouseState;
 
-            if (input.IsKeyDown(Keys.Escape))
+            if (keyboardInput.IsKeyDown(Keys.Escape))
             {
                 Close();
             }
@@ -269,40 +268,40 @@ namespace Clouds
             const float cameraSpeed = 30.5f;
             const float sensitivity = 0.2f;
 
-            if (input.IsKeyDown(Keys.W))
+            if (keyboardInput.IsKeyDown(Keys.W))
             {
                 _camera.Position += _camera.Front * cameraSpeed * (float)e.Time; // Forward
                 SetCameraPosition();
             }
 
-            if (input.IsKeyDown(Keys.S))
+            if (keyboardInput.IsKeyDown(Keys.S))
             {
                 _camera.Position -= _camera.Front * cameraSpeed * (float)e.Time; // Backwards
                 SetCameraPosition();
             }
-            if (input.IsKeyDown(Keys.A))
+            if (keyboardInput.IsKeyDown(Keys.A))
             {
                 _camera.Position -= _camera.Right * cameraSpeed * (float)e.Time; // Left
                 SetCameraPosition();
             }
-            if (input.IsKeyDown(Keys.D))
+            if (keyboardInput.IsKeyDown(Keys.D))
             {
                 _camera.Position += _camera.Right * cameraSpeed * (float)e.Time; // Right
                 SetCameraPosition();
             }
-            if (input.IsKeyDown(Keys.Space))
+            if (keyboardInput.IsKeyDown(Keys.Space))
             {
                 _camera.Position += _camera.Up * cameraSpeed * (float)e.Time; // Up
                 SetCameraPosition();
             }
-            if (input.IsKeyDown(Keys.LeftShift))
+            if (keyboardInput.IsKeyDown(Keys.LeftShift))
             {
                 _camera.Position -= _camera.Up * cameraSpeed * (float)e.Time; // Down
                 SetCameraPosition();
             }
 
 
-            if (!input.IsKeyDown(Keys.LeftControl))
+            if (!mouseInput.IsButtonDown(MouseButton.Right) && !mouseInput.IsButtonDown(MouseButton.Middle))
             {
                 _firstMove = true;
                 return;
@@ -338,22 +337,6 @@ namespace Clouds
             ImGui.ShowDemoWindow();
 
             ImGui.Begin("-");
-            //if (ImGui.TreeNodeEx("Camera", ImGuiTreeNodeFlags.DefaultOpen))
-            //{
-            //    if (ImGui.DragFloat3("Camera Position", ref camera.Position, 0.01f))
-            //    {
-            //        SetViewMatrix();
-            //    }
-            //    if (ImGui.DragFloat3("Camera Target", ref cameraTarget, 0.01f))
-            //    {
-            //        SetViewMatrix();
-            //    }
-            //    if (ImGui.DragFloat("Camera FOV", ref camera.Fov, 0.1f, 10.0f, 179.0f, "%.1f", ImGuiSliderFlags.AlwaysClamp))
-            //    {
-            //        SetProjectionMatrix();
-            //    }
-            //    ImGui.TreePop();
-            //}
             if (ImGui.TreeNodeEx("Clouds box", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat3("Center", ref cloudsBoxCenter, 0.01f))
