@@ -195,12 +195,13 @@ void main()
     float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
     //FragColor = clearColor + rayMarchedDensity;
     float densityEps = 0.001f;
+
     if (rayMarchedDensity < densityEps)
     {
-      FragColor = clearColor;
+      FragColor = vec4(clearColor.xyz, 0);
     }
     else
     {
-      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
+      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, rayMarchedDensity);
     }
 }
