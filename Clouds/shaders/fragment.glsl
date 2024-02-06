@@ -19,7 +19,6 @@ uniform sampler2D cloudsTexture;
 
 uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
-//uniform sampler2D weatherTexture;
 
 uniform vec3 lightPos;
 uniform int lightmarchStepCount;

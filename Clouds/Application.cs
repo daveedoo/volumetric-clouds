@@ -25,9 +25,13 @@ namespace Clouds
         private int vaoId;
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
+        private const int CloudsTextureSize = 128;
         private const int Shape3DTexSize = 32;
         private const int Detail3DTexSize = 32;
-        
+        private const TextureUnit CloudsTextureUnit = TextureUnit.Texture0;
+        private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
+        private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
+
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
         private Vector3 lightPos = new(1.0f,0.2f,0.0f);
@@ -95,10 +99,8 @@ namespace Clouds
 
         private void SetupTexture()
         {
-            const int cloudsTextureUnit = 0;
-
             int texId = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.ActiveTexture(CloudsTextureUnit);
             GL.BindTexture(TextureTarget.Texture2D, texId);
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -106,19 +108,17 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
-            (byte[] data, int texSize)= GetCloudTextureData();
+            (byte[] data, int texSize) = GetCloudTextureData();
             
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
-            program.SetInt("cloudsTexture", cloudsTextureUnit);
+            program.SetInt("cloudsTexture", CloudsTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
         {
-            int TexUnit = 1;      // 1 becouse first texture is used inside SetupTexture()
-
             Shape3DTexHandle = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.ActiveTexture(Shape3DTextureUnit);
             GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
 
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -129,11 +129,10 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
-            program.SetInt("shapeTexture", TexUnit);
-            TexUnit++;
+            program.SetInt("shapeTexture", Shape3DTextureUnit - TextureUnit.Texture0);
 
             Detail3DTexHandle = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.ActiveTexture(Details3DTextureUnit);
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -144,7 +143,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
-            program.SetInt("detailsTexture", TexUnit);
+            program.SetInt("detailsTexture", Details3DTextureUnit - TextureUnit.Texture0);
         }
 
         private byte[] GenerateRandom3DBytes(int arraySize)
@@ -158,9 +157,8 @@ namespace Clouds
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = 128;
             // mock
-            return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
+            return (Enumerable.Repeat<byte>(255, 4 * CloudsTextureSize * CloudsTextureSize).ToArray(), CloudsTextureSize);
         }
 
         private void GeneratePerlinTextures()
