@@ -254,18 +254,18 @@ void main()
             while(z<32)
             {
                   // Option 1: Generate noise using perling generator
-//                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
-//                float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
-//                float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
-//                float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
-//                vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, (a+1.0f)*0.5f);
+                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
+                float g = perlinNoise(vec3(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y));
+                float b = perlinNoise(vec3(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z));
+                float a = perlinNoise(vec3(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w));
+                vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, (a+1.0f)*0.5f);
                 
                 // Option 2: Generate noise using voronoi generator
-                vec2 r = eval(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x);
-                vec2 g = eval(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y);
-                vec2 b = eval(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z);
-                vec2 a = eval(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w);
-                vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), (1.0f - sqrt(a.x)));
+//                vec2 r = eval(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x);
+//                vec2 g = eval(x/shapeSettings.y, y/shapeSettings.y, z/shapeSettings.y);
+//                vec2 b = eval(x/shapeSettings.z, y/shapeSettings.z, z/shapeSettings.z);
+//                vec2 a = eval(x/shapeSettings.w, y/shapeSettings.w, z/shapeSettings.w);
+//                vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), (1.0f - sqrt(a.x)));
                 
                 
                 imageStore(shape,ivec3(x,y,z),res);
@@ -286,16 +286,16 @@ void main()
     while(z<32)
     {
         // Option 1
-//        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
-//        float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
-//        float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
-//        vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, 1.0f);
+        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
+        float g = perlinNoise(vec3(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y));
+        float b = perlinNoise(vec3(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z));
+        vec4 res = vec4( (r+1.0f)*0.5f, (g+1.0f)*0.5f, (b+1.0f)*0.5f, 1.0f);
 
         // Option 2
-        vec2 r = eval(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x);
-        vec2 g = eval(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y);
-        vec2 b = eval(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z);
-        vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), 1.0f);
+//        vec2 r = eval(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x);
+//        vec2 g = eval(x/detailSettings.y, y/detailSettings.y, z/detailSettings.y);
+//        vec2 b = eval(x/detailSettings.z, y/detailSettings.z, z/detailSettings.z);
+//        vec4 res = vec4( (1.0f - sqrt(r.x)), (1.0f - sqrt(g.x)), (1.0f - sqrt(b.x)), 1.0f);
 
 
         imageStore(detail,ivec3(x,y,z),res);

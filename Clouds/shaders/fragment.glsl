@@ -69,6 +69,7 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
+    height = 1 - height;
     vec4 weather = texture(cloudsTexture, texCoords);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
@@ -110,29 +111,6 @@ float getCloudValue(vec2 texCoords, float height)
     return result;
 }
 
-
-float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
-{
-    float RAYMARCH_STEP = 0.01f;
-    //float RAYMARCH_STEP = 1.0f;
-    float density = 0.0f;
-    vec3 samplePoint = cameraPos + dstToBox * rayDir;
-    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
-    {
-        samplePoint += RAYMARCH_STEP * rayDir;
-
-        vec3 boxPoint = cloudsBoxCenter - samplePoint;
-        vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
-        float height = boxPoint.y / cloudsBoxHeight + 0.5f;
-
-        float cloud = getCloudValue(texCoords, height);
-
-        // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
-        density += RAYMARCH_STEP * cloud;
-    }
-    return density;
-}
-
 // to use when getCloudValue is fixed
 float lightmarchCloud(vec3 pos)
 { 
@@ -158,6 +136,30 @@ float lightmarchCloud(vec3 pos)
 
     return minLightEnergy + t*(1-minLightEnergy);
 }
+
+float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
+{
+    float RAYMARCH_STEP = 0.01f;
+    //float RAYMARCH_STEP = 1.0f;
+    float density = 0.0f;
+    vec3 samplePoint = cameraPos + dstToBox * rayDir;
+    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
+    {
+        samplePoint += RAYMARCH_STEP * rayDir;
+
+        vec3 boxPoint = cloudsBoxCenter - samplePoint;
+        vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
+        float height = boxPoint.y / cloudsBoxHeight + 0.5f;
+
+        float cloud = getCloudValue(texCoords, height);
+
+        // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
+        density += RAYMARCH_STEP * cloud * lightmarchCloud(samplePoint);
+    }
+    return density;
+}
+
+
 
 void main()
 {

@@ -114,7 +114,7 @@ namespace Clouds
         {
             int TexUnit = 1;      // 1 becouse first texture is used inside SetupTexture()
 
-            int Shape3DTexHandle = GL.GenTexture();
+            Shape3DTexHandle = GL.GenTexture();
             GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
             GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
 
@@ -129,7 +129,7 @@ namespace Clouds
             program.SetInt("shapeTexture", TexUnit);
             TexUnit++;
 
-            int Detail3DTexHandle = GL.GenTexture();
+            Detail3DTexHandle = GL.GenTexture();
             GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
