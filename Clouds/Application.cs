@@ -4,9 +4,6 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using System.Runtime.CompilerServices;
-using OpenTK.Windowing.Common;
-using System.Threading.Channels;
 
 namespace Clouds
 {
@@ -30,7 +27,7 @@ namespace Clouds
         //
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
-        private Vector3 lightPos = new(1.0f,0.2f,5.0f);
+        private System.Numerics.Vector3 lightPos = new(1.0f,0.2f,5.0f);
         private int lightmarchStepCount = 20;
         private float cloudAbsorption = 1.0f;
         private float sunAbsorption = 0.2f;
@@ -229,7 +226,7 @@ namespace Clouds
         private void UpdateAnimation(float dt)
         {
             accumulatedTime += dt / 100;
-            var currTime = accumulatedTime;// - (int)accumulatedTime;
+            var currTime = accumulatedTime;
 
             animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(currTime, currTime));
             animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(currTime, currTime));
@@ -258,7 +255,7 @@ namespace Clouds
 
             program.SetFloat("densityEps", densityEps);
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
-            program.SetVec3("lightPos", lightPos);
+            program.SetVec3("lightPos", new Vector3(lightPos.X, lightPos.Y, lightPos.Z));
             program.SetInt("lightmarchStepCount",lightmarchStepCount);
             program.SetFloat("cloudAbsorption", cloudAbsorption);
             program.SetFloat("minLightEnergy", minLightEnergy);
@@ -441,6 +438,11 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
+                if (ImGui.DragFloat3("Light Position", ref lightPos, 0.01f))
+                {
+                    program.SetVec3("lightPos", new Vector3(lightPos.X, lightPos.Y, lightPos.Z));
+                }
+                ImGui.TreePop();
             }
 
             if (ImGui.TreeNodeEx("Global", ImGuiTreeNodeFlags.DefaultOpen))
