@@ -27,7 +27,7 @@ namespace Clouds
         private int Detail3DTexHandle;
         private const int Shape3DTexSize = 32;
         private const int Detail3DTexSize = 32;
-        
+        //
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
         private Vector3 lightPos = new(1.0f,0.2f,0.0f);
@@ -127,7 +127,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
-            var blueNoiseSize = 128;
+            var blueNoiseSize = 32;
             byte[] data = GetBlueNoiseData(blueNoiseSize);
 
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
@@ -180,7 +180,7 @@ namespace Clouds
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = 128;
+            int texSize = 32;
             // mock
             return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
         }
