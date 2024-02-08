@@ -23,7 +23,6 @@ uniform sampler2D blueNoiseTexture;
 
 uniform vec3 lightPos;
 uniform int lightmarchStepCount;
-uniform float transmittance;
 uniform float cloudAbsorption;
 uniform float sunAbsorption;
 uniform float minLightEnergy;
@@ -140,7 +139,7 @@ float lightmarchCloud(vec3 pos)
     return minLightEnergy + t*(1-minLightEnergy);
 }
 
-float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
+float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
     float RAYMARCH_STEP = 0.01f;
     //float RAYMARCH_STEP = 1.0f;
@@ -171,10 +170,11 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
         {
             // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
             // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
-            lightEnergy += RAYMARCH_STEP * pointDensity;// * lightmarchCloud(samplePoint) * transmittance1;
-            //transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
+            lightEnergy += RAYMARCH_STEP * pointDensity * lightmarchCloud(samplePoint) * transmittance1;
+            transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
         }    
     }
+    t = transmittance1;
     return lightEnergy;
 }
 
@@ -191,10 +191,13 @@ void main()
         discard;
     }
 
+    float transmittance = 0.0f;
+
     // ray-marching loop
-    float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
+    float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
     //FragColor = clearColor + rayMarchedDensity;
     float densityEps = 0.001f;
+
 
     if (rayMarchedDensity < densityEps)
     {
@@ -202,6 +205,8 @@ void main()
     }
     else
     {
-      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, rayMarchedDensity);
+      vec3 outCol = vec3(rayMarchedDensity); 
+      //outCol = outCol + clearColor.xyz*transmittance;
+      FragColor = vec4(outCol, 1.0f);
     }
 }

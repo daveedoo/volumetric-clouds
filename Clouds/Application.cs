@@ -146,9 +146,9 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
 
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Repeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
             program.SetInt("shapeTexture", TexUnit);
@@ -161,9 +161,9 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
 
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Repeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
             program.SetInt("detailsTexture", TexUnit);
@@ -258,11 +258,11 @@ namespace Clouds
 
             program.SetFloat("densityEps", densityEps);
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
-            //program.SetVec3("lightPos", lightPos);
-            //program.SetInt("lightmarchStepCount",lightmarchStepCount);
-            //program.SetFloat("cloudAbsorption", cloudAbsorption);
-            //program.SetFloat("minLightEnergy", minLightEnergy);
-            //program.SetFloat("sunAbsorption", sunAbsorption);
+            program.SetVec3("lightPos", lightPos);
+            program.SetInt("lightmarchStepCount",lightmarchStepCount);
+            program.SetFloat("cloudAbsorption", cloudAbsorption);
+            program.SetFloat("minLightEnergy", minLightEnergy);
+            program.SetFloat("sunAbsorption", sunAbsorption);
         }
 
 
@@ -300,7 +300,7 @@ namespace Clouds
                 Close();
             }
 
-            const float cameraSpeed = 30.5f;
+            const float cameraSpeed = 10.5f;
             const float sensitivity = 0.2f;
 
             if (keyboardInput.IsKeyDown(Keys.W))
