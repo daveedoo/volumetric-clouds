@@ -57,8 +57,9 @@ namespace Clouds
             _camera.Pitch = -10;
             SetupShaders();
             SetupVAO();
-            SetupTexture(); 
+            SetupCloudsTexture(); 
             SetupPerlinGeneratedTextures();
+            SetupBlueNoiseTexture();
             GeneratePerlinTextures();
         }
 
@@ -93,7 +94,7 @@ namespace Clouds
             SetGlobalUniforms();
         }
 
-        private void SetupTexture()
+        private void SetupCloudsTexture()
         {
             const int cloudsTextureUnit = 0;
 
@@ -111,6 +112,27 @@ namespace Clouds
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
             program.SetInt("cloudsTexture", cloudsTextureUnit);
+        }
+
+        private void SetupBlueNoiseTexture()
+        {
+            const int cloudsTextureUnit = 3; /// we have already 3 textures initialized
+
+            int texId = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, texId);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+
+            var blueNoiseSize = 128;
+            byte[] data = GetBlueNoiseData(blueNoiseSize);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
+
+            program.SetInt("blueNoiseTexture", cloudsTextureUnit);
         }
 
         private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
@@ -161,6 +183,15 @@ namespace Clouds
             int texSize = 128;
             // mock
             return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
+        }
+
+        // TODO: decide if byte type is the best
+        private byte[] GetBlueNoiseData(int arraySize)
+        {
+            var rand = new Random();
+            var res = new byte[4 * (int)Math.Pow(arraySize, 2)];
+            rand.NextBytes(res);
+            return res;
         }
 
         private void GeneratePerlinTextures()
@@ -369,11 +400,47 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
-            if(ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.TreeNodeEx("Texture settings", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                ImGui.TreePop();
+            }
+            if (ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
                 ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
                 ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Cloud absorption", ref cloudAbsorption))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Density epsilon", ref densityEps))
+                {
+                    SetGlobalUniforms();
+                }
             }
 
             if (ImGui.TreeNodeEx("Global", ImGuiTreeNodeFlags.DefaultOpen))
@@ -386,32 +453,19 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
+                var backgroundColor = new System.Numerics.Vector3(clearColor.R, clearColor.G, clearColor.B);
+                if (ImGui.ColorPicker3("Background color", ref backgroundColor))
+                {
+                    clearColor.R = backgroundColor[0];
+                    clearColor.G = backgroundColor[1];
+                    clearColor.B = backgroundColor[2];
+                    SetGlobalUniforms();
+                }
+
                 ImGui.TreePop();
             }
 
-            if(ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
-            {
-                if(ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount))
-                {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Cloud absorption", ref cloudAbsorption))
-                {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Sun absorption", ref sunAbsorption))
-                {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
-                {
-                    SetGlobalUniforms();
-                }
-                if (ImGui.DragFloat("Density epsilon", ref densityEps))
-                {
-                    SetGlobalUniforms();
-                }
-            }
+
 
             ImGui.End();
         }
