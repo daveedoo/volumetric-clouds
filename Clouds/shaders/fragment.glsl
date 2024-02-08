@@ -175,7 +175,7 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
         }    
     }
     t = transmittance1;
-    return lightEnergy;
+    return lightEnergy*2;
 }
 
 
@@ -206,7 +206,7 @@ void main()
     else
     {
       vec3 outCol = vec3(rayMarchedDensity); 
-      //outCol = outCol + clearColor.xyz*transmittance;
+      outCol = outCol + clearColor.xyz*transmittance;
       FragColor = vec4(outCol, 1.0f);
     }
 }
