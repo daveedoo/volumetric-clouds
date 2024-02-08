@@ -4,6 +4,9 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
+using System.Runtime.CompilerServices;
+using OpenTK.Windowing.Common;
+using System.Threading.Channels;
 
 namespace Clouds
 {
@@ -382,18 +385,6 @@ namespace Clouds
                 if (ImGui.DragFloat("Height", ref cloudsBoxHeight, 0.01f, 0.1f, float.MaxValue))
                 {
                     SetCloudBoxUniforms();
-                }
-                ImGui.TreePop();
-            }
-            if(ImGui.TreeNodeEx("Texture generation", ImGuiTreeNodeFlags.DefaultOpen))  
-            {
-                if(ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
-                {
-                    GeneratePerlinTextures();
-                }
-                if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
-                {
-                    GeneratePerlinTextures();
                 }
                 ImGui.TreePop();
             }

@@ -70,7 +70,6 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
-    //height = 1 - height;
     vec4 weather = texture(cloudsTexture, texCoords);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
@@ -78,39 +77,36 @@ float getCloudValue(vec2 texCoords, float height)
 
     //b channel stance for height of cloud (3.1.3.1)
     float wh = weather.b; 
-    float ph = 1 - height; 
+    float ph = height; 
     float SRb = SAT(R(ph, 0.0f, 0.07f, 0.0f, 1.0f));
     float SRt = SAT(R(ph, weather.b * 0.2f, weather.b, 1.0f, 0.0f));
     float SA = SRb * SRt;
 
     //alfa channel stance for density of cloud (3.1.3.2)
     float wd = weather.a;
-    float daph = height;
-    float DRb = daph * SAT(R(daph, 0.0f, 0.15f, 0.0f, 1.0f));
-    float DRt = daph * SAT(R(daph, 0.9f, 1.0f, 1.0f, 0.0f));
-    float DA = globalDensity * DRb * DRt * wd * 2;
+    float DRb = ph * SAT(R(ph, 0.0f, 0.15f, 0.0f, 1.0f));
+    float DRt = ph * SAT(R(ph, 0.9f, 1.0f, 1.0f, 0.0f));
+    float DA = globalDensity * DRb * DRt * weather.a * 2;
 
     //
     // Shape and detail noise (3.1.4)
     //
-    vec4 sn = texture(shapeTexture, vec3(texCoords + shapeOffset, 0)); 
+    vec4 sn = texture(shapeTexture, vec3(texCoords.x, height, texCoords.y) + vec3(shapeOffset, 0));
 
     float SNsample = R(sn.r, (sn.g * 0.625f + sn.b * 0.25f + sn.a * 0.12f) - 1.0f, 1.0f, 0.0f, 1.0f);
-    float SN = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f)) * DA;
-    
-    //detail noise
-    vec4 dn = texture(detailsTexture, vec3(texCoords + detailsOffset, 0));
 
-    float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f; 
+    //detail noise
+    vec4 dn = texture(detailsTexture, vec3(texCoords.x, height, texCoords.y) + vec3(detailsOffset, 0));
+
+    float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f;
+   
     float DNmod = 0.35f * exp(-globalCoverage * 0.75f) * L(DNfbm, 1 - DNfbm, SAT(ph * 5));
-    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f));
+    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1, 0, 1));
     
     // final result taking everything into consideration
-    float result = SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
-    //return result;
-    // result giving good effects, but it is not final one
-    return result;
-}
+    return SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
+  }
+
 
 // to use when getCloudValue is fixed
 float lightmarchCloud(vec3 pos)
@@ -209,4 +205,5 @@ void main()
       outCol = outCol + clearColor.xyz*transmittance;
       FragColor = vec4(outCol, 1.0f);
     }
+
 }
