@@ -413,23 +413,23 @@ namespace Clouds
 
             if (ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount))
+                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount, 1, 1, 50))
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Cloud absorption", ref cloudAbsorption))
+                if (ImGui.DragFloat("Cloud absorption", ref cloudAbsorption, 0.1f, 0.0f, 3.0f))
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption))
+                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption, 0.1f, 0.0f, 3.0f))
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
+                if (ImGui.DragFloat("Minimum light energy", ref minLightEnergy, 0.1f, 0.0f, 10f))
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Density epsilon", ref densityEps))
+                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f,0.001f, 0.5f ))
                 {
                     SetGlobalUniforms();
                 }
