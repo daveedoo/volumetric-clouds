@@ -25,8 +25,11 @@ namespace Clouds
         private int vaoId;
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
+
         private const int Shape3DTexSize = 32;
         private const int Detail3DTexSize = 32;
+        private const int AllTexSize = 32;
+
         //
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
@@ -127,7 +130,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
-            var blueNoiseSize = 32;
+            var blueNoiseSize = AllTexSize;
             byte[] data = GetBlueNoiseData(blueNoiseSize);
 
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
@@ -180,7 +183,7 @@ namespace Clouds
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = 32;
+            int texSize = AllTexSize;
             // mock
             return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
         }
@@ -210,6 +213,7 @@ namespace Clouds
             // OpenTK use Vector4 from OpenTK.Mathematics and ImGUI need Vector4 from System.Numerics
             computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
             computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
+            computeShader.SetInt("texSize", AllTexSize);
             GL.DispatchCompute(32,32,1);
 
             // make sure writing to image has finished before read

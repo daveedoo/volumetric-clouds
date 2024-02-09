@@ -8,6 +8,7 @@ layout(rgba32f, binding=2) uniform image3D detail;
 
 uniform vec4 shapeSettings;
 uniform vec4 detailSettings;
+uniform int texSize;
 
 // code from shadertoy: https://www.shadertoy.com/view/wsX3D7
 
@@ -247,11 +248,11 @@ void main()
 	uint z = gl_GlobalInvocationID.z;
 
     // texture size's are 32 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
-    while(x<32)
+    while(x<texSize)
     {
-        while(y<32)
+        while(y<texSize)
         {
-            while(z<32)
+            while(z<texSize)
             {
                   // Option 1: Generate noise using perling generator
 //                float r = perlinNoise(vec3(x/shapeSettings.x, y/shapeSettings.x, z/shapeSettings.x));
@@ -283,7 +284,7 @@ void main()
     y = gl_GlobalInvocationID.y;
     z = gl_GlobalInvocationID.z;
 
-    while(z<32)
+    while(z<texSize)
     {
         // Option 1
 //        float r = perlinNoise(vec3(x/detailSettings.x, y/detailSettings.x, z/detailSettings.x));
