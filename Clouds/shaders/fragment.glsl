@@ -70,7 +70,8 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
-    vec4 weather = texture(cloudsTexture, texCoords);
+    //vec4 weather = texture(cloudsTexture, texCoords);
+    vec4 weather = vec4(1,1,1,1);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
     float WMc = max(weather.r, SAT(globalCoverage - 0.5f) * weather.g * 2);
@@ -137,7 +138,7 @@ float lightmarchCloud(vec3 pos)
 
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
-    float RAYMARCH_STEP = 0.01f;
+    float RAYMARCH_STEP = 1.0f;
     //float RAYMARCH_STEP = 1.0f;
     float density = 0.0f;
 
@@ -154,6 +155,28 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
 
+
+
+//    float dist =0.0f;
+//
+//    while(dist<dstInBox && transmittance1>0.01f)
+//    {
+//        samplePoint += RAYMARCH_STEP * rayDir;
+//        vec3 boxPoint = cloudsBoxCenter - samplePoint;
+//        vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
+//        float height = boxPoint.y / cloudsBoxHeight + 0.5f;
+//        float pointDensity = getCloudValue(texCoords, height);
+//
+//        if(pointDensity>densityEps)
+//        {
+//            // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
+//            // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
+//            lightEnergy += RAYMARCH_STEP * pointDensity * lightmarchCloud(samplePoint) * transmittance1;
+//            transmittance1 *= exp(pointDensity*RAYMARCH_STEP*cloudAbsorption);
+//        }    
+//        dist += RAYMARCH_STEP;
+//    }
+
     for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
     {
         samplePoint += RAYMARCH_STEP * rayDir;
@@ -166,12 +189,13 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
         {
             // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
             // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
-            lightEnergy += RAYMARCH_STEP * pointDensity * lightmarchCloud(samplePoint) * transmittance1;
+            lightEnergy += pointDensity * RAYMARCH_STEP * lightmarchCloud(samplePoint) * transmittance1;
             transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
         }    
     }
+
     t = transmittance1;
-    return lightEnergy*5;
+    return lightEnergy;//*15;
 }
 
 

@@ -42,8 +42,8 @@ namespace Clouds
             _controller.Update(this, (float)e.Time);
 
 
-            //GL.Enable(EnableCap.Blend);
-            //GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.DstAlpha);
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
             GL.ClearColor(clearColor);
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
@@ -51,7 +51,7 @@ namespace Clouds
             HandleMouseAndKeyboardInput(e);
             RenderScene();
 
-            //GL.Disable(EnableCap.Blend);
+            GL.Disable(EnableCap.Blend);
 
             RenderGUI();
             _controller.Render();

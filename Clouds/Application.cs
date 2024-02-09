@@ -26,38 +26,40 @@ namespace Clouds
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
 
-        private const int Shape3DTexSize = 32;
-        private const int Detail3DTexSize = 32;
-        private const int AllTexSize = 32;
+        private const int Shape3DTexSize = 128;
+        private const int Detail3DTexSize = 128;
+        private const int AllTexSize = 128;
 
         //
         private Vector2i windowSize = defaultWindowSize;
-        private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
+        private Vector3 cameraPosition = new(440.0f, 0.0f, 700.0f);
         private System.Numerics.Vector3 lightPos = new(1.0f,0.2f,5.0f);
-        private int lightmarchStepCount = 3;
-        private float cloudAbsorption = 1.0f;
+        private int lightmarchStepCount = 4;
+        private float cloudAbsorption = 1.2f;
         private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;
-        private float densityEps = 0.01f;
+        private float densityEps = 0.001f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
-        private float cloudsBoxSideLength = 2.0f;
-        private float cloudsBoxHeight = 2.0f;
-        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(10f,5f, 4f, 2f);
+        private float cloudsBoxSideLength = 700.0f;
+        private float cloudsBoxHeight = 700.0f;
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(40f,5f, 4f, 2f);
         private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(4f, 3f, 2f, 2f);
 
-        private float globalCoverage = 0.5f;
-        private float globalDensity = 0.5f;
+        private float globalCoverage = 0.4f;
+        private float globalDensity = 0.4f;
 
         AnimationSettings animation_settings = new AnimationSettings();
+        
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
         {
             Title = "Clouds";
             _camera = new Camera(cameraPosition, (float)windowSize.X / windowSize.Y);
-            _camera.Yaw = 180;
+            _camera.Yaw = 240;
             _camera.Pitch = -10;
+            animation_settings.ShapeSpeed = new System.Numerics.Vector2(-2f, 2f);
             SetupShaders();
             SetupVAO();
             SetupCloudsTexture(); 
@@ -114,7 +116,7 @@ namespace Clouds
             
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
-            program.SetInt("cloudsTexture", cloudsTextureUnit);
+            //program.SetInt("cloudsTexture", cloudsTextureUnit);
         }
 
         private void SetupBlueNoiseTexture()
@@ -184,8 +186,13 @@ namespace Clouds
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
             int texSize = AllTexSize;
-            // mock
+            //// mock
             return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
+
+            //var rand = new Random();
+            //var res = new byte[4 * (int)Math.Pow(texSize, 2)];
+            //rand.NextBytes(res);
+            //return (res, texSize);
         }
 
         // TODO: decide if byte type is the best
@@ -263,7 +270,7 @@ namespace Clouds
             program.SetFloat("densityEps", densityEps);
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
             program.SetVec3("lightPos", new Vector3(lightPos.X, lightPos.Y, lightPos.Z));
-            program.SetInt("lightmarchStepCount",lightmarchStepCount);
+            program.SetInt("lightmarchStepCount", lightmarchStepCount);
             program.SetFloat("cloudAbsorption", cloudAbsorption);
             program.SetFloat("minLightEnergy", minLightEnergy);
             program.SetFloat("sunAbsorption", sunAbsorption);
@@ -304,7 +311,7 @@ namespace Clouds
                 Close();
             }
 
-            const float cameraSpeed = 10.5f;
+            const float cameraSpeed = 100.5f;
             const float sensitivity = 0.2f;
 
             if (keyboardInput.IsKeyDown(Keys.W))
@@ -413,7 +420,7 @@ namespace Clouds
 
             if (ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount, 1, 1, 50))
+                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount, 1, 1, 30))
                 {
                     SetGlobalUniforms();
                 }
@@ -421,7 +428,7 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption, 0.1f, 0.0f, 3.0f))
+                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption, 0.1f, 0.0f, 0.7f))
                 {
                     SetGlobalUniforms();
                 }
