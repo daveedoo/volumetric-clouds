@@ -33,7 +33,7 @@ namespace Clouds
         //
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(440.0f, 0.0f, 700.0f);
-        private System.Numerics.Vector3 lightPos = new(1.0f,0.2f,5.0f);
+        private System.Numerics.Vector3 lightPos = new(1.0f,400f,5.0f);
         private int lightmarchStepCount = 4;
         private float cloudAbsorption = 1.2f;
         private float sunAbsorption = 0.2f;
@@ -48,6 +48,7 @@ namespace Clouds
 
         private float globalCoverage = 0.4f;
         private float globalDensity = 0.4f;
+        private int Perlin = 1; // 1 - Perlin, 2 - Voronoi
 
         AnimationSettings animation_settings = new AnimationSettings();
         
@@ -221,6 +222,7 @@ namespace Clouds
             computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
             computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
             computeShader.SetInt("texSize", AllTexSize);
+            computeShader.SetInt("Perlin", Perlin);
             GL.DispatchCompute(32,32,1);
 
             // make sure writing to image has finished before read
@@ -406,6 +408,10 @@ namespace Clouds
                     GeneratePerlinTextures();
                 }
                 if (ImGui.DragFloat4("Detail settings", ref detailSettings, 0.01f))
+                {
+                    GeneratePerlinTextures();
+                }
+                if(ImGui.DragInt("Perlin - 1 || Voronoi - 2", ref Perlin, 1, 1,2))
                 {
                     GeneratePerlinTextures();
                 }
