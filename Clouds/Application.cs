@@ -31,7 +31,7 @@ namespace Clouds
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
         private System.Numerics.Vector3 lightPos = new(1.0f,0.2f,5.0f);
-        private int lightmarchStepCount = 20;
+        private int lightmarchStepCount = 3;
         private float cloudAbsorption = 1.0f;
         private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;

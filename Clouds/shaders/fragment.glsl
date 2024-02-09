@@ -77,7 +77,7 @@ float getCloudValue(vec2 texCoords, float height)
 
     //b channel stance for height of cloud (3.1.3.1)
     float wh = weather.b; 
-    float ph = height; 
+    float ph = 1-height; 
     float SRb = SAT(R(ph, 0.0f, 0.07f, 0.0f, 1.0f));
     float SRt = SAT(R(ph, weather.b * 0.2f, weather.b, 1.0f, 0.0f));
     float SA = SRb * SRt;
@@ -91,12 +91,12 @@ float getCloudValue(vec2 texCoords, float height)
     //
     // Shape and detail noise (3.1.4)
     //
-    vec4 sn = texture(shapeTexture, vec3(texCoords.x, height, texCoords.y) + vec3(shapeOffset, 0));
+    vec4 sn = texture(shapeTexture, vec3(texCoords.x, height, texCoords.y) + vec3(shapeOffset.x, 0,shapeOffset.y));
 
     float SNsample = R(sn.r, (sn.g * 0.625f + sn.b * 0.25f + sn.a * 0.12f) - 1.0f, 1.0f, 0.0f, 1.0f);
 
     //detail noise
-    vec4 dn = texture(detailsTexture, vec3(texCoords.x, height, texCoords.y) + vec3(detailsOffset, 0));
+    vec4 dn = texture(detailsTexture, vec3(texCoords.x, height, texCoords.y) + vec3(detailsOffset.x, 0,detailsOffset.y));
 
     float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f;
    
@@ -171,7 +171,7 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
         }    
     }
     t = transmittance1;
-    return lightEnergy*2;
+    return lightEnergy*5;
 }
 
 

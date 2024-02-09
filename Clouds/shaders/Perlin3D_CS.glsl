@@ -246,7 +246,7 @@ void main()
 	uint y = gl_GlobalInvocationID.y;
 	uint z = gl_GlobalInvocationID.z;
 
-    // texture size's are 128x128x128 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
+    // texture size's are 32 so every work group with diffrent starting x,y value needs to fill whole tex with data from Perlin noise
     while(x<32)
     {
         while(y<32)
