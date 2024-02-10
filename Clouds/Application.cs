@@ -17,6 +17,24 @@ namespace Clouds
         public System.Numerics.Vector2 ShapeSpeed;
         public System.Numerics.Vector2 DetailSpeed;
     }
+
+    struct HenyeyGreensteinSettings
+    {
+        public float inScatter;
+        public float outScatter;
+        public float ivo;
+        public float sci;
+        public float sce;
+
+        public HenyeyGreensteinSettings()
+        {
+            inScatter = 0.4f;
+            outScatter = 0.8f;
+            ivo = 0.55f;
+            sci = 3;
+            sce = 50;
+        }
+    }
     public class Application : Window
     {
         private GLWrappers.Program program;
@@ -33,7 +51,7 @@ namespace Clouds
         //
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(440.0f, 0.0f, 700.0f);
-        private System.Numerics.Vector3 lightPos = new(1.0f,400f,5.0f);
+        private System.Numerics.Vector3 lightPos = new(1.0f, 400f, 5.0f);
         private int lightmarchStepCount = 4;
         private float cloudAbsorption = 1.2f;
         private float sunAbsorption = 0.2f;
@@ -43,15 +61,16 @@ namespace Clouds
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 700.0f;
         private float cloudsBoxHeight = 700.0f;
-        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(40f,5f, 4f, 2f);
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(40f, 5f, 4f, 2f);
         private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(4f, 3f, 2f, 2f);
 
         private float globalCoverage = 0.4f;
         private float globalDensity = 0.4f;
-        private int Perlin = 1; // 1 - Perlin, 2 - Voronoi
+        private int NoiseGenerationType = 1; // 1 - Perlin, 2 - Voronoi
 
         AnimationSettings animation_settings = new AnimationSettings();
-        
+        HenyeyGreensteinSettings henyeyGreensteinSettings = new HenyeyGreensteinSettings();
+
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
@@ -63,7 +82,7 @@ namespace Clouds
             animation_settings.ShapeSpeed = new System.Numerics.Vector2(-2f, 2f);
             SetupShaders();
             SetupVAO();
-            SetupCloudsTexture(); 
+            SetupCloudsTexture();
             SetupPerlinGeneratedTextures();
             SetupBlueNoiseTexture();
             GeneratePerlinTextures();
@@ -75,8 +94,18 @@ namespace Clouds
             GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
             float[] vertices =
             [
-                -1.0f, -1.0f,   1.0f, 1.0f,     -1.0f, 1.0f,
-                -1.0f, -1.0f,   1.0f, -1.0f,    1.0f, 1.0f
+                -1.0f,
+                -1.0f,
+                1.0f,
+                1.0f,
+                -1.0f,
+                1.0f,
+                -1.0f,
+                -1.0f,
+                1.0f,
+                -1.0f,
+                1.0f,
+                1.0f
             ];
             GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
 
@@ -91,7 +120,7 @@ namespace Clouds
             using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.glsl");
             using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
-            
+
 
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
@@ -113,8 +142,8 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
-            (byte[] data, int texSize)= GetCloudTextureData();
-            
+            (byte[] data, int texSize) = GetCloudTextureData();
+
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
             //program.SetInt("cloudsTexture", cloudsTextureUnit);
@@ -222,8 +251,9 @@ namespace Clouds
             computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
             computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
             computeShader.SetInt("texSize", AllTexSize);
-            computeShader.SetInt("Perlin", Perlin);
-            GL.DispatchCompute(32,32,1);
+            computeShader.SetInt("Perlin", NoiseGenerationType);
+
+            GL.DispatchCompute(32, 32, 1);
 
             // make sure writing to image has finished before read
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
@@ -247,8 +277,17 @@ namespace Clouds
             animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(currTime, currTime));
             animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(currTime, currTime));
 
-            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y) );
+            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y));
             program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
+        }
+
+        private void UpdateHenyeyGreensteinSettings()
+        {
+            program.SetFloat("ivo", henyeyGreensteinSettings.ivo);
+            program.SetFloat("inScatter", henyeyGreensteinSettings.inScatter);
+            program.SetFloat("outScatter", henyeyGreensteinSettings.outScatter);
+            program.SetFloat("sci", henyeyGreensteinSettings.sci);
+            program.SetFloat("sce", henyeyGreensteinSettings.sce);
         }
 
         private void SetCameraPosition()
@@ -375,7 +414,7 @@ namespace Clouds
                 _camera.Pitch -= deltaY * sensitivity; // Reversed since y-coordinates range from bottom to top
             }
         }
-    
+
 
         protected override void RenderGUI()
         {
@@ -411,7 +450,7 @@ namespace Clouds
                 {
                     GeneratePerlinTextures();
                 }
-                if(ImGui.DragInt("Perlin - 1 || Voronoi - 2", ref Perlin, 1, 1,2))
+                if (ImGui.DragInt("Perlin - 1 || Voronoi - 2", ref NoiseGenerationType, 1, 1, 2))
                 {
                     GeneratePerlinTextures();
                 }
@@ -421,6 +460,31 @@ namespace Clouds
             {
                 ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
                 ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Henyey Greenstein Settings", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragFloat("In vs out scattering", ref henyeyGreensteinSettings.ivo, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("In scattering", ref henyeyGreensteinSettings.inScatter, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Out scattering", ref henyeyGreensteinSettings.outScatter, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Sun extra intensity", ref henyeyGreensteinSettings.sci, 0.01f, 1, 50))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Sun extra intensity exponens", ref henyeyGreensteinSettings.sce, 0.01f, 1, 50))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
                 ImGui.TreePop();
             }
 
@@ -442,7 +506,7 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f,0.001f, 0.5f ))
+                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f, 0.001f, 0.5f))
                 {
                     SetGlobalUniforms();
                 }

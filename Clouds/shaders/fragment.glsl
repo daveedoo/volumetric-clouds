@@ -28,6 +28,13 @@ uniform float sunAbsorption;
 uniform float minLightEnergy;
 uniform float densityEps;
 
+uniform float ivo;
+uniform float inScatter;
+uniform float outScatter;
+uniform float sci;
+uniform float sce;
+
+
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
 {
@@ -136,6 +143,18 @@ float lightmarchCloud(vec3 pos)
     return minLightEnergy + t*(1-minLightEnergy);
 }
 
+const float PI = 3.14159265f;
+float HenyeyGreenstein(float phi, float g)
+{
+    float g2 = g * g;
+    
+    return 1 / (4 * PI) * (1 - g2) / pow(1 + g2 - 2 * g * cos(phi), 1.5f);
+}
+float ISextra(float phi)
+{
+    return sci * pow(SAT(phi), sce);
+}
+
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
     float RAYMARCH_STEP = 1.0f;
@@ -190,6 +209,11 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
             // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
             // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
             lightEnergy += pointDensity * RAYMARCH_STEP * lightmarchCloud(samplePoint) * transmittance1;
+            //
+            float sunviewDot = dot(normalize(lightPos), rayDir);
+            float henyeyGreensteinComponent = L(max(HenyeyGreenstein(sunviewDot, inScatter), ISextra(sunviewDot)), HenyeyGreenstein(sunviewDot, -outScatter), ivo);
+            lightEnergy += henyeyGreensteinComponent;
+
             transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
         }    
     }
