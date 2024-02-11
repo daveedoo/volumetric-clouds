@@ -18,10 +18,10 @@ uniform vec4 clearColor;
 uniform sampler2D cloudsTexture;
 uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
+uniform sampler2D blueNoiseTexture;
 
 uniform vec3 lightPos;
 uniform int lightmarchStepCount;
-uniform float transmittance;
 uniform float cloudAbsorption;
 uniform float sunAbsorption;
 uniform float minLightEnergy;
@@ -31,6 +31,13 @@ uniform sampler2D previousFrame;
 uniform bool reprojectionOn;
 uniform int reprojIdx;
 const int[16] reprojMap = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+
+uniform float ivo;
+uniform float inScatter;
+uniform float outScatter;
+uniform float sci;
+uniform float sce;
+
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
@@ -74,45 +81,43 @@ float L(float v0, float v1, float ival) { return (1 - ival) * v0 + ival * v1; }
 //
 float getCloudValue(vec2 texCoords, float height)
 {
-    //height = 1 - height;
-    vec4 weather = texture(cloudsTexture, texCoords);
+    //vec4 weather = texture(cloudsTexture, texCoords);
+    vec4 weather = vec4(1,1,1,1);
     
     //r, g channels stance for probability of occuring the cloud in given XY coord (3.1.2)
     float WMc = max(weather.r, SAT(globalCoverage - 0.5f) * weather.g * 2);
 
     //b channel stance for height of cloud (3.1.3.1)
     float wh = weather.b; 
-    float ph = 1 - height; 
+    float ph = 1-height; 
     float SRb = SAT(R(ph, 0.0f, 0.07f, 0.0f, 1.0f));
     float SRt = SAT(R(ph, weather.b * 0.2f, weather.b, 1.0f, 0.0f));
     float SA = SRb * SRt;
 
     //alfa channel stance for density of cloud (3.1.3.2)
     float wd = weather.a;
-    float daph = height;
-    float DRb = daph * SAT(R(daph, 0.0f, 0.15f, 0.0f, 1.0f));
-    float DRt = daph * SAT(R(daph, 0.9f, 1.0f, 1.0f, 0.0f));
-    float DA = globalDensity * DRb * DRt * wd * 2;
+    float DRb = ph * SAT(R(ph, 0.0f, 0.15f, 0.0f, 1.0f));
+    float DRt = ph * SAT(R(ph, 0.9f, 1.0f, 1.0f, 0.0f));
+    float DA = globalDensity * DRb * DRt * weather.a * 2;
 
     //
     // Shape and detail noise (3.1.4)
     //
-    vec4 sn = texture(shapeTexture, vec3(texCoords + shapeOffset, 0)); 
+    vec4 sn = texture(shapeTexture, vec3(texCoords.x, height, texCoords.y) + vec3(shapeOffset.x, 0,shapeOffset.y));
 
     float SNsample = R(sn.r, (sn.g * 0.625f + sn.b * 0.25f + sn.a * 0.12f) - 1.0f, 1.0f, 0.0f, 1.0f);
-    float SN = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f)) * DA;
-    
-    //detail noise
-    vec4 dn = texture(detailsTexture, vec3(texCoords + detailsOffset, 0));
 
-    float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f; 
+    //detail noise
+    vec4 dn = texture(detailsTexture, vec3(texCoords.x, height, texCoords.y) + vec3(detailsOffset.x, 0,detailsOffset.y));
+
+    float DNfbm = dn.r * 0.625f + dn.g * 0.25f + dn.b * 0.125f;
+   
     float DNmod = 0.35f * exp(-globalCoverage * 0.75f) * L(DNfbm, 1 - DNfbm, SAT(ph * 5));
-    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1.0f, 0.0f, 1.0f));
+    float SNnd = SAT(R(SNsample * SA, 1 - globalCoverage * WMc, 1, 0, 1));
     
     // final result taking everything into consideration
-    float result = SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
-    return result;
-}
+    return SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
+  }
 
 // to use when getCloudValue is fixed
 float lightmarchCloud(vec3 pos)
@@ -141,17 +146,36 @@ float lightmarchCloud(vec3 pos)
     return minLightEnergy + t*(1-minLightEnergy);
 }
 
-float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
+const float PI = 3.14159265f;
+float HenyeyGreenstein(float phi, float g)
 {
-    float RAYMARCH_STEP = 0.01f;
+    float g2 = g * g;
+    
+    return 1 / (4 * PI) * (1 - g2) / pow(1 + g2 - 2 * g * cos(phi), 1.5f);
+}
+float ISextra(float phi)
+{
+    return sci * pow(SAT(phi), sce);
+}
+
+float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
+{
+    float RAYMARCH_STEP = 1.0f;
     //float RAYMARCH_STEP = 1.0f;
     float density = 0.0f;
 
     // TODO: Blue noise offset of samplePoint
     vec3 samplePoint = cameraPos + dstToBox * rayDir;
 
+    vec3 boxPoint = cloudsBoxCenter - samplePoint;
+    vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
+
+    vec4 blueNoiseValue = texture(blueNoiseTexture, texCoords);
+    samplePoint += rayDir * RAYMARCH_STEP * 4 * (blueNoiseValue.r - 0.5);
+
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
+
 
     for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
     {
@@ -163,12 +187,14 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
 
         if(pointDensity>densityEps)
         {
-            // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
-            // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
-            lightEnergy += RAYMARCH_STEP * pointDensity;// * lightmarchCloud(samplePoint) * transmittance1;
-            //transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
+            float sunviewDot = dot(normalize(lightPos), rayDir);
+            float henyeyGreensteinComponent = L(max(HenyeyGreenstein(sunviewDot, inScatter), ISextra(sunviewDot)), HenyeyGreenstein(sunviewDot, -outScatter), ivo);
+            lightEnergy += pointDensity * RAYMARCH_STEP * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
+            transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
         }    
     }
+
+    t = transmittance1;
     return lightEnergy;
 }
 
@@ -188,23 +214,25 @@ void main()
             return;
         }
 
+        float transmittance = 0.0f;
+
         // ray-marching loop
-        float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
-        FragColor = clearColor + rayMarchedDensity;
-        //    float densityEps = 0.001f;
-        //    if (rayMarchedDensity < densityEps)
-        //    {
-        //      FragColor = clearColor;
-        //    }
-        //    else
-        //    {
-        //      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
-        //    }
-        //    FragColor = vec4(gl_FragCoord.xy, 1.0, 1.0f);
+        float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
+
+
+        if (rayMarchedDensity < densityEps)
+        {
+          FragColor = vec4(clearColor.xyz, 0);
+        }
+        else
+        {
+          vec3 outCol = vec3(rayMarchedDensity); 
+          outCol = outCol + clearColor.xyz*transmittance;
+          FragColor = vec4(outCol, 1.0f);
+        }
     }
     else
     {
-//        FragColor = clearColor;
         FragColor = texture(previousFrame, vec2(gl_FragCoord.x / 1600.0f, gl_FragCoord.y / 900.0f));
     }
 }

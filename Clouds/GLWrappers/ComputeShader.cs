@@ -79,6 +79,13 @@ namespace Clouds.GLWrappers
             //GL.UseProgram(Handle);
             GL.Uniform1(UniformLoc[name], data);
         }
+
+        public void SetInt(string name, int data)
+        {
+            //GL.UseProgram(Handle);
+            GL.Uniform1(UniformLoc[name], data);
+        }
+
         public void SetVec3(string name, Vector3 vec)
         {
             GL.Uniform3(UniformLoc[name], vec);

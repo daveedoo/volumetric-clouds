@@ -14,6 +14,24 @@ namespace Clouds
         public System.Numerics.Vector2 ShapeSpeed;
         public System.Numerics.Vector2 DetailSpeed;
     }
+
+    struct HenyeyGreensteinSettings
+    {
+        public float inScatter;
+        public float outScatter;
+        public float ivo;
+        public float sci;
+        public float sce;
+
+        public HenyeyGreensteinSettings()
+        {
+            inScatter = 0.4f;
+            outScatter = 0.8f;
+            ivo = 0.55f;
+            sci = 3;
+            sce = 50;
+        }
+    }
     public class Application : Window
     {
         private GLWrappers.Program program;
@@ -24,9 +42,7 @@ namespace Clouds
         private int vaoId;
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
-        private const int CloudsTextureSize = 128;
-        private const int Shape3DTexSize = 32;
-        private const int Detail3DTexSize = 32;
+        
         private const TextureUnit CloudsTextureUnit = TextureUnit.Texture0;
         private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
         private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
@@ -36,39 +52,49 @@ namespace Clouds
         private bool ReprojectionOn = true;
         private FBO fbo;
 
+        private const int Shape3DTexSize = 128;
+        private const int Detail3DTexSize = 128;
+        private const int AllTexSize = 128;
+
+        //
         private Vector2i windowSize = defaultWindowSize;
-        private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
-        private Vector3 lightPos = new(1.0f,0.2f,0.0f);
-        private int lightmarchStepCount = 20;
-        private float cloudAbsorption = 1.0f;
+        private Vector3 cameraPosition = new(440.0f, 0.0f, 700.0f);
+        private System.Numerics.Vector3 lightPos = new(1.0f, 400f, 5.0f);
+        private int lightmarchStepCount = 4;
+        private float cloudAbsorption = 1.2f;
         private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;
-        private float densityEps = 0.01f;
+        private float densityEps = 0.001f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
-        private float cloudsBoxSideLength = 2.0f;
-        private float cloudsBoxHeight = 2.0f;
-        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(10f,5f, 4f, 2f);
+        private float cloudsBoxSideLength = 700.0f;
+        private float cloudsBoxHeight = 700.0f;
+        private System.Numerics.Vector4 shapeSettings = new System.Numerics.Vector4(40f, 5f, 4f, 2f);
         private System.Numerics.Vector4 detailSettings = new System.Numerics.Vector4(4f, 3f, 2f, 2f);
 
-        private float globalCoverage = 0.5f;
-        private float globalDensity = 0.5f;
+        private float globalCoverage = 0.4f;
+        private float globalDensity = 0.4f;
+        private int NoiseGenerationType = 1; // 1 - Perlin, 2 - Voronoi
 
         AnimationSettings animation_settings = new AnimationSettings();
+        HenyeyGreensteinSettings henyeyGreensteinSettings = new HenyeyGreensteinSettings();
+
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
         public Application() : base(defaultWindowSize)
         {
             Title = "Clouds";
             _camera = new Camera(cameraPosition, (float)windowSize.X / windowSize.Y);
-            _camera.Yaw = 180;
+            _camera.Yaw = 240;
             _camera.Pitch = -10;
 
+            animation_settings.ShapeSpeed = new System.Numerics.Vector2(-2f, 2f);
             SetupFBO();
             SetupShaders();
             SetupVAO();
-            SetupTexture();
+            SetupCloudsTexture();
             SetupPerlinGeneratedTextures();
+            SetupBlueNoiseTexture();
             GeneratePerlinTextures();
         }
 
@@ -95,8 +121,18 @@ namespace Clouds
             GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
             float[] vertices =
             [
-                -1.0f, -1.0f,   1.0f, 1.0f,     -1.0f, 1.0f,
-                -1.0f, -1.0f,   1.0f, -1.0f,    1.0f, 1.0f
+                -1.0f,
+                -1.0f,
+                1.0f,
+                1.0f,
+                -1.0f,
+                1.0f,
+                -1.0f,
+                -1.0f,
+                1.0f,
+                -1.0f,
+                1.0f,
+                1.0f
             ];
             GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
 
@@ -126,7 +162,7 @@ namespace Clouds
             program.SetInt("previousFrame", TexQuadTextureUnit - TextureUnit.Texture0);
         }
 
-        private void SetupTexture()
+        private void SetupCloudsTexture()
         {
             int texId = GL.GenTexture();
             GL.ActiveTexture(CloudsTextureUnit);
@@ -138,10 +174,30 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
             (byte[] data, int texSize) = GetCloudTextureData();
-            
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
             program.SetInt("cloudsTexture", CloudsTextureUnit - TextureUnit.Texture0);
+        }
+
+        private void SetupBlueNoiseTexture()
+        {
+            const int cloudsTextureUnit = 3; /// we have already 3 textures initialized
+
+            int texId = GL.GenTexture();
+            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, texId);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
+
+            var blueNoiseSize = AllTexSize;
+            byte[] data = GetBlueNoiseData(blueNoiseSize);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
+
+            program.SetInt("blueNoiseTexture", cloudsTextureUnit);
         }
 
         private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
@@ -153,9 +209,9 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
 
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.MirroredRepeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
             program.SetInt("shapeTexture", Shape3DTextureUnit - TextureUnit.Texture0);
@@ -167,9 +223,9 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Linear);
 
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
-            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.Clamp);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.MirroredRepeat);
+            GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.MirroredRepeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
             program.SetInt("detailsTexture", Details3DTextureUnit - TextureUnit.Texture0);
@@ -182,12 +238,26 @@ namespace Clouds
             rand.NextBytes(res);
             return res;
         }
-
+        //
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            // mock
-            return (Enumerable.Repeat<byte>(255, 4 * CloudsTextureSize * CloudsTextureSize).ToArray(), CloudsTextureSize);
+            //// mock
+            return (Enumerable.Repeat<byte>(255, 4 * AllTexSize * AllTexSize).ToArray(), AllTexSize);
+
+            //var rand = new Random();
+            //var res = new byte[4 * (int)Math.Pow(texSize, 2)];
+            //rand.NextBytes(res);
+            //return (res, texSize);
+        }
+
+        // TODO: decide if byte type is the best
+        private byte[] GetBlueNoiseData(int arraySize)
+        {
+            var rand = new Random();
+            var res = new byte[4 * (int)Math.Pow(arraySize, 2)];
+            rand.NextBytes(res);
+            return res;
         }
 
         private void GeneratePerlinTextures()
@@ -206,7 +276,10 @@ namespace Clouds
             // OpenTK use Vector4 from OpenTK.Mathematics and ImGUI need Vector4 from System.Numerics
             computeShader.SetVec4("shapeSettings", new Vector4(shapeSettings.X, shapeSettings.Y, shapeSettings.Z, shapeSettings.W));
             computeShader.SetVec4("detailSettings", new Vector4(detailSettings.X, detailSettings.Y, detailSettings.Z, detailSettings.W));
-            GL.DispatchCompute(32,32,1);
+            computeShader.SetInt("texSize", AllTexSize);
+            computeShader.SetInt("Perlin", NoiseGenerationType);
+
+            GL.DispatchCompute(32, 32, 1);
 
             // make sure writing to image has finished before read
             GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
@@ -225,13 +298,22 @@ namespace Clouds
         private void UpdateAnimation(float dt)
         {
             accumulatedTime += dt / 100;
-            var currTime = accumulatedTime - (int)accumulatedTime;
+            var currTime = accumulatedTime;
 
             animation_settings.ShapeOffset = animation_settings.ShapeSpeed * (new System.Numerics.Vector2(currTime, currTime));
             animation_settings.DetailOffset = animation_settings.DetailSpeed * (new System.Numerics.Vector2(currTime, currTime));
 
-            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y) );
+            program.SetVec2("shapeOffset", new Vector2(animation_settings.ShapeOffset.X, animation_settings.ShapeOffset.Y));
             program.SetVec2("detailsOffset", new Vector2(animation_settings.DetailOffset.X, animation_settings.DetailOffset.Y));
+        }
+
+        private void UpdateHenyeyGreensteinSettings()
+        {
+            program.SetFloat("ivo", henyeyGreensteinSettings.ivo);
+            program.SetFloat("inScatter", henyeyGreensteinSettings.inScatter);
+            program.SetFloat("outScatter", henyeyGreensteinSettings.outScatter);
+            program.SetFloat("sci", henyeyGreensteinSettings.sci);
+            program.SetFloat("sce", henyeyGreensteinSettings.sce);
         }
 
         private void SetCameraPosition()
@@ -253,11 +335,11 @@ namespace Clouds
 
             program.SetFloat("densityEps", densityEps);
             // Uncomment when lightmarching will be used to change cloud color (will impact result)
-            //program.SetVec3("lightPos", lightPos);
-            //program.SetInt("lightmarchStepCount",lightmarchStepCount);
-            //program.SetFloat("cloudAbsorption", cloudAbsorption);
-            //program.SetFloat("minLightEnergy", minLightEnergy);
-            //program.SetFloat("sunAbsorption", sunAbsorption);
+            program.SetVec3("lightPos", new Vector3(lightPos.X, lightPos.Y, lightPos.Z));
+            program.SetInt("lightmarchStepCount", lightmarchStepCount);
+            program.SetFloat("cloudAbsorption", cloudAbsorption);
+            program.SetFloat("minLightEnergy", minLightEnergy);
+            program.SetFloat("sunAbsorption", sunAbsorption);
         }
         private void SetReprojectionUniform()
         {
@@ -304,7 +386,7 @@ namespace Clouds
                 Close();
             }
 
-            const float cameraSpeed = 30.5f;
+            const float cameraSpeed = 100.5f;
             const float sensitivity = 0.2f;
 
             if (keyboardInput.IsKeyDown(Keys.W))
@@ -366,7 +448,7 @@ namespace Clouds
                 _camera.Pitch -= deltaY * sensitivity; // Reversed since y-coordinates range from bottom to top
             }
         }
-    
+
 
         protected override void RenderGUI()
         {
@@ -392,9 +474,9 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
-            if(ImGui.TreeNodeEx("Texture generation", ImGuiTreeNodeFlags.DefaultOpen))  
+            if (ImGui.TreeNodeEx("Texture settings", ImGuiTreeNodeFlags.DefaultOpen))
             {
-                if(ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
+                if (ImGui.DragFloat4("Shape settings", ref shapeSettings, 0.01f))
                 {
                     GeneratePerlinTextures();
                 }
@@ -402,12 +484,70 @@ namespace Clouds
                 {
                     GeneratePerlinTextures();
                 }
+                if (ImGui.DragInt("Perlin - 1 || Voronoi - 2", ref NoiseGenerationType, 1, 1, 2))
+                {
+                    GeneratePerlinTextures();
+                }
                 ImGui.TreePop();
             }
-            if(ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.TreeNodeEx("Animation", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 ImGui.DragFloat2("Shape animation", ref animation_settings.ShapeSpeed, 0.01f);
                 ImGui.DragFloat2("Detail animation", ref animation_settings.DetailSpeed, 0.01f);
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Henyey Greenstein Settings", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragFloat("In vs out scattering", ref henyeyGreensteinSettings.ivo, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("In scattering", ref henyeyGreensteinSettings.inScatter, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Out scattering", ref henyeyGreensteinSettings.outScatter, 0.01f, 0, 1))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Sun extra intensity", ref henyeyGreensteinSettings.sci, 0.01f, 1, 50))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                if (ImGui.DragFloat("Sun extra intensity exponens", ref henyeyGreensteinSettings.sce, 0.01f, 1, 50))
+                {
+                    UpdateHenyeyGreensteinSettings();
+                }
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount, 1, 1, 30))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Cloud absorption", ref cloudAbsorption, 0.1f, 0.0f, 3.0f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Sun absorption", ref sunAbsorption, 0.1f, 0.0f, 0.7f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Minimum light energy", ref minLightEnergy, 0.1f, 0.0f, 10f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f, 0.000f, 0.5f))
+                {
+                    SetGlobalUniforms();
+                }
+                if (ImGui.DragFloat3("Light Position", ref lightPos, 0.01f))
+                {
+                    program.SetVec3("lightPos", new Vector3(lightPos.X, lightPos.Y, lightPos.Z));
+                }
                 ImGui.TreePop();
             }
 
@@ -421,29 +561,12 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
-                ImGui.TreePop();
-            }
-
-            if(ImGui.TreeNodeEx("Ray marching", ImGuiTreeNodeFlags.DefaultOpen))
-            {
-                if(ImGui.DragInt("Lighmarching step count", ref lightmarchStepCount))
+                var backgroundColor = new System.Numerics.Vector3(clearColor.R, clearColor.G, clearColor.B);
+                if (ImGui.ColorPicker3("Background color", ref backgroundColor))
                 {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Cloud absorption", ref cloudAbsorption))
-                {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Sun absorption", ref sunAbsorption))
-                {
-                    SetGlobalUniforms();
-                }
-                if(ImGui.DragFloat("Minimum light energy", ref minLightEnergy))
-                {
-                    SetGlobalUniforms();
-                }
-                if (ImGui.DragFloat("Density epsilon", ref densityEps))
-                {
+                    clearColor.R = backgroundColor[0];
+                    clearColor.G = backgroundColor[1];
+                    clearColor.B = backgroundColor[2];
                     SetGlobalUniforms();
                 }
                 ImGui.TreePop();
@@ -457,6 +580,7 @@ namespace Clouds
                 }
                 ImGui.TreePop();
             }
+
 
             ImGui.End();
         }
