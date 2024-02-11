@@ -164,7 +164,6 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     // TODO: Blue noise offset of samplePoint
     vec3 samplePoint = cameraPos + dstToBox * rayDir;
 
-    // texture is smaller that the render target, multiply by 5 to wrap the tex
     vec3 boxPoint = cloudsBoxCenter - samplePoint;
     vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
 
@@ -174,27 +173,6 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
 
-
-
-//    float dist =0.0f;
-//
-//    while(dist<dstInBox && transmittance1>0.01f)
-//    {
-//        samplePoint += RAYMARCH_STEP * rayDir;
-//        vec3 boxPoint = cloudsBoxCenter - samplePoint;
-//        vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
-//        float height = boxPoint.y / cloudsBoxHeight + 0.5f;
-//        float pointDensity = getCloudValue(texCoords, height);
-//
-//        if(pointDensity>densityEps)
-//        {
-//            // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
-//            // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
-//            lightEnergy += RAYMARCH_STEP * pointDensity * lightmarchCloud(samplePoint) * transmittance1;
-//            transmittance1 *= exp(pointDensity*RAYMARCH_STEP*cloudAbsorption);
-//        }    
-//        dist += RAYMARCH_STEP;
-//    }
 
     for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
     {
@@ -206,27 +184,21 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
 
         if(pointDensity>densityEps)
         {
-            // TODO: what is the best coefficient? (in place of RAYMARCH_STEP here)
-            // Turn off lightmarch function for now, need to get white cloud out of only pointDensity data
-            lightEnergy += pointDensity * RAYMARCH_STEP * lightmarchCloud(samplePoint) * transmittance1;
-            //
             float sunviewDot = dot(normalize(lightPos), rayDir);
             float henyeyGreensteinComponent = L(max(HenyeyGreenstein(sunviewDot, inScatter), ISextra(sunviewDot)), HenyeyGreenstein(sunviewDot, -outScatter), ivo);
-            lightEnergy += henyeyGreensteinComponent;
-
+            lightEnergy += pointDensity * RAYMARCH_STEP * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
             transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
         }    
     }
 
     t = transmittance1;
-    return lightEnergy;//*15;
+    return lightEnergy;
 }
 
 
 
 void main()
 {
-    // rayDir or 1/rayDir?
     vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
     float dstToBox = intersection.x;
     float dstInBox = intersection.y;
@@ -239,8 +211,6 @@ void main()
 
     // ray-marching loop
     float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
-    //FragColor = clearColor + rayMarchedDensity;
-    float densityEps = 0.001f;
 
 
     if (rayMarchedDensity < densityEps)

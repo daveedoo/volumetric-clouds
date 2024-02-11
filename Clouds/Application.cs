@@ -506,7 +506,7 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
-                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f, 0.001f, 0.5f))
+                if (ImGui.DragFloat("Density epsilon", ref densityEps, 0.001f, 0.000f, 0.5f))
                 {
                     SetGlobalUniforms();
                 }
