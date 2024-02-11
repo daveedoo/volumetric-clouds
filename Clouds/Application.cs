@@ -46,7 +46,8 @@ namespace Clouds
         private const TextureUnit CloudsTextureUnit = TextureUnit.Texture0;
         private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
         private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
-        private const TextureUnit TexQuadTextureUnit = TextureUnit.Texture3;
+        private const TextureUnit BlueNoiseTextureUnit = TextureUnit.Texture3;
+        private const TextureUnit TexQuadTextureUnit = TextureUnit.Texture4;
 
         private int ReprojIdx = 0;
         private bool ReprojectionOn = true;
@@ -92,7 +93,7 @@ namespace Clouds
             SetupFBO();
             SetupShaders();
             SetupVAO();
-            SetupCloudsTexture();
+            //SetupCloudsTexture(); // unused
             SetupPerlinGeneratedTextures();
             SetupBlueNoiseTexture();
             GeneratePerlinTextures();
@@ -181,10 +182,8 @@ namespace Clouds
 
         private void SetupBlueNoiseTexture()
         {
-            const int cloudsTextureUnit = 3; /// we have already 3 textures initialized
-
             int texId = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.ActiveTexture(BlueNoiseTextureUnit);
             GL.BindTexture(TextureTarget.Texture2D, texId);
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -197,7 +196,7 @@ namespace Clouds
 
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
-            program.SetInt("blueNoiseTexture", cloudsTextureUnit);
+            program.SetInt("blueNoiseTexture", BlueNoiseTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
