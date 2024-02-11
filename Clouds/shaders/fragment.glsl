@@ -16,7 +16,6 @@ uniform float globalDensity;
 uniform vec4 clearColor;
 
 uniform sampler2D cloudsTexture;
-
 uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
 
@@ -27,6 +26,11 @@ uniform float cloudAbsorption;
 uniform float sunAbsorption;
 uniform float minLightEnergy;
 uniform float densityEps;
+
+uniform sampler2D previousFrame;
+uniform bool reprojectionOn;
+uniform int reprojIdx;
+const int[16] reprojMap = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
 
 // Returns (distanceToBox, distanceInBox). If ray misses box, distanceInBox will be zero
 vec2 testCloudsBoxIntersection(vec3 rayOrigin, vec3 raydir)
@@ -107,8 +111,6 @@ float getCloudValue(vec2 texCoords, float height)
     
     // final result taking everything into consideration
     float result = SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
-    //return result;
-    // result giving good effects, but it is not final one
     return result;
 }
 
@@ -170,29 +172,39 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox)
     return lightEnergy;
 }
 
-
-
 void main()
 {
-    // rayDir or 1/rayDir?
-    vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
-    float dstToBox = intersection.x;
-    float dstInBox = intersection.y;
-    if (dstInBox == 0)
-    {
-        discard;
-    }
+    ivec2 reproj = ivec2(int(gl_FragCoord.x) % 4, int(gl_FragCoord.y) % 4);
+    int pixelReprojIdx = reprojMap[reproj.y * 4 + reproj.x];
 
-    // ray-marching loop
-    float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
-    //FragColor = clearColor + rayMarchedDensity;
-    float densityEps = 0.001f;
-    if (rayMarchedDensity < densityEps)
+    if (!reprojectionOn || pixelReprojIdx == reprojIdx)
     {
-      FragColor = clearColor;
+        vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
+        float dstToBox = intersection.x;
+        float dstInBox = intersection.y;
+        if (dstInBox == 0)
+        {
+            FragColor = clearColor;
+            return;
+        }
+
+        // ray-marching loop
+        float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox);
+        FragColor = clearColor + rayMarchedDensity;
+        //    float densityEps = 0.001f;
+        //    if (rayMarchedDensity < densityEps)
+        //    {
+        //      FragColor = clearColor;
+        //    }
+        //    else
+        //    {
+        //      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
+        //    }
+        //    FragColor = vec4(gl_FragCoord.xy, 1.0, 1.0f);
     }
     else
     {
-      FragColor = vec4(rayMarchedDensity, rayMarchedDensity, rayMarchedDensity, 1.0f);
+//        FragColor = clearColor;
+        FragColor = texture(previousFrame, vec2(gl_FragCoord.x / 1600.0f, gl_FragCoord.y / 900.0f));
     }
 }

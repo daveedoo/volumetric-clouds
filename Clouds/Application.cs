@@ -4,9 +4,6 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using System.Runtime.CompilerServices;
-using OpenTK.Windowing.Common;
-using System.Threading.Channels;
 
 namespace Clouds
 {
@@ -20,6 +17,8 @@ namespace Clouds
     public class Application : Window
     {
         private GLWrappers.Program program;
+        private GLWrappers.Program texQuadProgram;
+
         private Camera _camera;
         private GLWrappers.ComputeShader computeShader;
         private int vaoId;
@@ -31,6 +30,11 @@ namespace Clouds
         private const TextureUnit CloudsTextureUnit = TextureUnit.Texture0;
         private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
         private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
+        private const TextureUnit TexQuadTextureUnit = TextureUnit.Texture3;
+
+        private int ReprojIdx = 0;
+        private bool ReprojectionOn = true;
+        private FBO fbo;
 
         private Vector2i windowSize = defaultWindowSize;
         private Vector3 cameraPosition = new(5.0f, 3.0f, 0.0f);
@@ -59,11 +63,30 @@ namespace Clouds
             _camera = new Camera(cameraPosition, (float)windowSize.X / windowSize.Y);
             _camera.Yaw = 180;
             _camera.Pitch = -10;
+
+            SetupFBO();
             SetupShaders();
             SetupVAO();
-            SetupTexture(); 
+            SetupTexture();
             SetupPerlinGeneratedTextures();
             GeneratePerlinTextures();
+        }
+
+        private void SetupFBO()
+        {
+            int fboTexId = GL.GenTexture();
+            GL.ActiveTexture(TexQuadTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, fboTexId);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba32f, defaultWindowSize.X, defaultWindowSize.Y, 0, PixelFormat.Rgba, PixelType.UnsignedByte, 0);
+
+            fbo = new FBO();
+            fbo.SetColorAttachment(fboTexId);
+            FBO.Unbind();
         }
 
         private void SetupVAO()
@@ -88,13 +111,19 @@ namespace Clouds
             using Shader vertexShader = new(ShaderType.VertexShader, "../../../shaders/vertex.glsl");
             using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
-            
 
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
             SetCameraPosition();
             SetCloudBoxUniforms();
             SetGlobalUniforms();
+            SetReprojectionUniform();
+
+            using Shader texQuadVS = new(ShaderType.VertexShader, "../../../shaders/texQuadVS.glsl");
+            using Shader texQuadPS = new(ShaderType.FragmentShader, "../../../shaders/texQuadPS.glsl");
+            texQuadProgram = new(texQuadVS, texQuadPS);
+            texQuadProgram.SetInt("Texture", TexQuadTextureUnit - TextureUnit.Texture0);
+            program.SetInt("previousFrame", TexQuadTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupTexture()
@@ -215,7 +244,6 @@ namespace Clouds
             program.SetFloat("cloudsBoxSideLength", cloudsBoxSideLength);
             program.SetFloat("cloudsBoxHeight", cloudsBoxHeight);
         }
-
         private void SetGlobalUniforms()
         {
             program.SetFloat("globalCoverage", globalCoverage);
@@ -231,17 +259,26 @@ namespace Clouds
             //program.SetFloat("minLightEnergy", minLightEnergy);
             //program.SetFloat("sunAbsorption", sunAbsorption);
         }
-
+        private void SetReprojectionUniform()
+        {
+            program.SetBool("reprojectionOn", ReprojectionOn);
+        }
 
         protected override void RenderScene()
         {
             program.Use();
-
-
             program.SetMat4("viewMtx", _camera.GetViewMatrix());
             program.SetMat4("projMtx", _camera.GetProjectionMatrix());
-
+            program.SetInt("reprojIdx", ReprojIdx);
+            ReprojIdx = (ReprojIdx + 1) % 16;
             GL.BindVertexArray(vaoId);
+
+
+            fbo.Bind();
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+
+            FBO.Unbind();
+            texQuadProgram.Use();
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 
@@ -409,6 +446,16 @@ namespace Clouds
                 {
                     SetGlobalUniforms();
                 }
+                ImGui.TreePop();
+            }
+
+            if (ImGui.TreeNodeEx("Reprojection", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.Checkbox("Reprojection ON", ref ReprojectionOn))
+                {
+                    SetReprojectionUniform();
+                }
+                ImGui.TreePop();
             }
 
             ImGui.End();
