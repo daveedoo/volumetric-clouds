@@ -47,7 +47,10 @@ namespace Clouds
         private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
         private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
         private const TextureUnit BlueNoiseTextureUnit = TextureUnit.Texture3;
-        private const TextureUnit TexQuadTextureUnit = TextureUnit.Texture4;
+        private TextureUnit TexQuadPrevTextureUnit = TextureUnit.Texture4;  // assignment at start, swaps every frame
+        private TextureUnit TexQuadTextureUnit = TextureUnit.Texture5;      // assignment at start, swaps every frame
+        private int TexQuadTextureID;
+        private int TexQuadPrevTextureID;
 
         private int ReprojIdx = 0;
         private bool ReprojectionOn = true;
@@ -101,9 +104,9 @@ namespace Clouds
 
         private void SetupFBO()
         {
-            int fboTexId = GL.GenTexture();
+            TexQuadTextureID = GL.GenTexture();
             GL.ActiveTexture(TexQuadTextureUnit);
-            GL.BindTexture(TextureTarget.Texture2D, fboTexId);
+            GL.BindTexture(TextureTarget.Texture2D, TexQuadTextureID);
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
@@ -111,8 +114,20 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba32f, defaultWindowSize.X, defaultWindowSize.Y, 0, PixelFormat.Rgba, PixelType.UnsignedByte, 0);
 
+
+            TexQuadPrevTextureID = GL.GenTexture();
+            GL.ActiveTexture(TexQuadPrevTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, TexQuadPrevTextureID);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba32f, defaultWindowSize.X, defaultWindowSize.Y, 0, PixelFormat.Rgba, PixelType.UnsignedByte, 0);
+
+
             fbo = new FBO();
-            fbo.SetColorAttachment(fboTexId);
+            fbo.SetColorAttachment(TexQuadTextureID);
             FBO.Unbind();
         }
 
@@ -160,7 +175,7 @@ namespace Clouds
             using Shader texQuadPS = new(ShaderType.FragmentShader, "../../../shaders/texQuadPS.glsl");
             texQuadProgram = new(texQuadVS, texQuadPS);
             texQuadProgram.SetInt("Texture", TexQuadTextureUnit - TextureUnit.Texture0);
-            program.SetInt("previousFrame", TexQuadTextureUnit - TextureUnit.Texture0);
+            program.SetInt("previousFrame", TexQuadPrevTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupCloudsTexture()
@@ -347,19 +362,36 @@ namespace Clouds
 
         protected override void RenderScene()
         {
+            if (ReprojectionOn)
+            {
+                (TexQuadPrevTextureUnit, TexQuadTextureUnit) = (TexQuadTextureUnit, TexQuadPrevTextureUnit);
+                (TexQuadPrevTextureID, TexQuadTextureID) = (TexQuadTextureID, TexQuadPrevTextureID);
+                fbo.SetColorAttachment(TexQuadTextureID);
+                program.SetInt("previousFrame", TexQuadPrevTextureUnit - TextureUnit.Texture0);
+                texQuadProgram.SetInt("Texture", TexQuadTextureUnit - TextureUnit.Texture0);
+            }
+
+            fbo.Bind();
             program.Use();
             program.SetMat4("viewMtx", _camera.GetViewMatrix());
             program.SetMat4("projMtx", _camera.GetProjectionMatrix());
             program.SetInt("reprojIdx", ReprojIdx);
             ReprojIdx = (ReprojIdx + 1) % 16;
             GL.BindVertexArray(vaoId);
+            
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            GL.ClearColor(clearColor);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
-
-            fbo.Bind();
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+
+            GL.Disable(EnableCap.Blend);
+
 
             FBO.Unbind();
             texQuadProgram.Use();
+            GL.Disable(EnableCap.DepthTest);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 

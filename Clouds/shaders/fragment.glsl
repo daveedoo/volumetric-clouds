@@ -218,17 +218,15 @@ void main()
 
         // ray-marching loop
         float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
-
-
         if (rayMarchedDensity < densityEps)
         {
-          FragColor = vec4(clearColor.xyz, 0);
+            FragColor = vec4(clearColor.xyz, 0);
         }
         else
         {
-          vec3 outCol = vec3(rayMarchedDensity); 
-          outCol = outCol + clearColor.xyz*transmittance;
-          FragColor = vec4(outCol, 1.0f);
+            vec3 outCol = vec3(rayMarchedDensity); 
+            outCol = outCol + clearColor.xyz*transmittance;
+            FragColor = vec4(outCol, 1.0f);
         }
     }
     else
