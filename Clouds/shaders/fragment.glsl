@@ -3,6 +3,7 @@ in vec3 rayDir;
 out vec4 FragColor;
 
 uniform vec3 cameraPos;
+uniform vec2 windowSize;
 
 uniform vec3 cloudsBoxCenter;
 uniform float cloudsBoxSideLength;
@@ -231,6 +232,6 @@ void main()
     }
     else
     {
-        FragColor = texture(previousFrame, vec2(gl_FragCoord.x / 1600.0f, gl_FragCoord.y / 900.0f));
+        FragColor = texture(previousFrame, vec2(gl_FragCoord.x / windowSize.x, gl_FragCoord.y / windowSize.y));
     }
 }

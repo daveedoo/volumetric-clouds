@@ -85,6 +85,7 @@ namespace Clouds
 
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
+        private double FPS = 0.0f;
         public Application() : base(defaultWindowSize)
         {
             Title = "Clouds";
@@ -306,6 +307,7 @@ namespace Clouds
             base.OnUpdateFrame(args);
             var time = args.Time;
             UpdateAnimation((float)time);
+            FPS = 1.0 / args.Time;
         }
 
         float accumulatedTime = 0;
@@ -354,6 +356,7 @@ namespace Clouds
             program.SetFloat("cloudAbsorption", cloudAbsorption);
             program.SetFloat("minLightEnergy", minLightEnergy);
             program.SetFloat("sunAbsorption", sunAbsorption);
+            program.SetVec2("windowSize", defaultWindowSize);
         }
         private void SetReprojectionUniform()
         {
@@ -489,6 +492,16 @@ namespace Clouds
             ImGui.ShowDemoWindow();
 
             ImGui.Begin("-");
+            ImGui.Text($"FPS: {FPS:F2}");
+            if (ImGui.TreeNodeEx("Reprojection", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.Checkbox("Reprojection ON", ref ReprojectionOn))
+                {
+                    SetReprojectionUniform();
+                }
+                ImGui.TreePop();
+            }
+
             if (ImGui.TreeNodeEx("Clouds box", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat3("Center", ref cloudsBoxCenter, 0.01f))
@@ -599,15 +612,6 @@ namespace Clouds
                     clearColor.G = backgroundColor[1];
                     clearColor.B = backgroundColor[2];
                     SetGlobalUniforms();
-                }
-                ImGui.TreePop();
-            }
-
-            if (ImGui.TreeNodeEx("Reprojection", ImGuiTreeNodeFlags.DefaultOpen))
-            {
-                if (ImGui.Checkbox("Reprojection ON", ref ReprojectionOn))
-                {
-                    SetReprojectionUniform();
                 }
                 ImGui.TreePop();
             }
