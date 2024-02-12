@@ -178,12 +178,11 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     float transmittance1 = 1.0f;
 
     float distanceTravelled = 0.0f;
-//    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
     float marchStep = RAYMARCH_SHORT_STEP;
     bool usingLongSteps = false;
     int emptyStepsCount = 0;
     int maxEmptyStepsCount = int(ceil(LONG_STEP_MULTIPLIER));
-    while (distanceTravelled < dstInBox)
+    while (distanceTravelled < dstInBox && lightEnergy < 1.0f)
     {
         samplePoint += marchStep * rayDir;
         distanceTravelled += marchStep;
