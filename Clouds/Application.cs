@@ -69,6 +69,8 @@ namespace Clouds
         private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;
         private float densityEps = 0.001f;
+        private float raymarchShortStep = 1.0f;
+        private float longStepMultiplier = 3.0f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 700.0f;
@@ -170,7 +172,8 @@ namespace Clouds
             SetCameraPosition();
             SetCloudBoxUniforms();
             SetGlobalUniforms();
-            SetReprojectionUniform();
+            SetOptimizationUniforms();
+            program.SetVec2("windowSize", defaultWindowSize);
 
             using Shader texQuadVS = new(ShaderType.VertexShader, "../../../shaders/texQuadVS.glsl");
             using Shader texQuadPS = new(ShaderType.FragmentShader, "../../../shaders/texQuadPS.glsl");
@@ -356,11 +359,12 @@ namespace Clouds
             program.SetFloat("cloudAbsorption", cloudAbsorption);
             program.SetFloat("minLightEnergy", minLightEnergy);
             program.SetFloat("sunAbsorption", sunAbsorption);
-            program.SetVec2("windowSize", defaultWindowSize);
         }
-        private void SetReprojectionUniform()
+        private void SetOptimizationUniforms()
         {
             program.SetBool("reprojectionOn", ReprojectionOn);
+            program.SetFloat("RAYMARCH_SHORT_STEP", 1.0f);
+            program.SetFloat("LONG_STEP_MULTIPLIER", 3.0f);
         }
 
         protected override void RenderScene()
@@ -493,11 +497,19 @@ namespace Clouds
 
             ImGui.Begin("-");
             ImGui.Text($"FPS: {FPS:F2}");
-            if (ImGui.TreeNodeEx("Reprojection", ImGuiTreeNodeFlags.DefaultOpen))
+            if (ImGui.TreeNodeEx("Optimization", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.Checkbox("Reprojection ON", ref ReprojectionOn))
                 {
-                    SetReprojectionUniform();
+                    SetOptimizationUniforms();
+                }
+                if (ImGui.DragFloat("Raymarch short step", ref raymarchShortStep, 0.1f, 0.1f, 1000.0f))
+                {
+                    SetOptimizationUniforms();
+                }
+                if (ImGui.DragFloat("Long step multiplier", ref longStepMultiplier, 0.1f, 1.0f, 20.0f))
+                {
+                    SetOptimizationUniforms();
                 }
                 ImGui.TreePop();
             }

@@ -32,6 +32,8 @@ uniform sampler2D previousFrame;
 uniform bool reprojectionOn;
 uniform int reprojIdx;
 const int[16] reprojMap = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+uniform float RAYMARCH_SHORT_STEP;
+uniform float LONG_STEP_MULTIPLIER;
 
 uniform float ivo;
 uniform float inScatter;
@@ -161,8 +163,6 @@ float ISextra(float phi)
 
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
-    float RAYMARCH_SHORT_STEP = 1.0f;
-    float LONG_STEP_MULTIPLIER = 3.f;
     float density = 0.0f;
 
     // TODO: Blue noise offset of samplePoint
