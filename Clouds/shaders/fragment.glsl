@@ -161,8 +161,8 @@ float ISextra(float phi)
 
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
-    float RAYMARCH_STEP = 1.0f;
-    //float RAYMARCH_STEP = 1.0f;
+    float RAYMARCH_SHORT_STEP = 1.0f;
+    float LONG_STEP_MULTIPLIER = 3.f;
     float density = 0.0f;
 
     // TODO: Blue noise offset of samplePoint
@@ -172,27 +172,54 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
 
     vec4 blueNoiseValue = texture(blueNoiseTexture, texCoords);
-    samplePoint += rayDir * RAYMARCH_STEP * 4 * (blueNoiseValue.r - 0.5);
+    samplePoint += rayDir * RAYMARCH_SHORT_STEP * 4 * (blueNoiseValue.r - 0.5);
 
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
 
-
-    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
+    float distanceTravelled = 0.0f;
+//    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
+    float marchStep = RAYMARCH_SHORT_STEP;
+    bool usingLongSteps = false;
+    int emptyStepsCount = 0;
+    int maxEmptyStepsCount = int(ceil(LONG_STEP_MULTIPLIER));
+    while (distanceTravelled < dstInBox)
     {
-        samplePoint += RAYMARCH_STEP * rayDir;
+        samplePoint += marchStep * rayDir;
+        distanceTravelled += marchStep;
+
         vec3 boxPoint = cloudsBoxCenter - samplePoint;
         vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
         float height = boxPoint.y / cloudsBoxHeight + 0.5f;
         float pointDensity = getCloudValue(texCoords, height);
 
-        if(pointDensity>densityEps)
+        if(pointDensity > densityEps)
         {
+            emptyStepsCount = 0;
+            if (usingLongSteps)
+            {
+                samplePoint -= marchStep * rayDir;
+                distanceTravelled -= marchStep;
+
+                marchStep = RAYMARCH_SHORT_STEP;
+                usingLongSteps = false;
+                continue;
+            }
+
             float sunviewDot = dot(normalize(lightPos), rayDir);
             float henyeyGreensteinComponent = L(max(HenyeyGreenstein(sunviewDot, inScatter), ISextra(sunviewDot)), HenyeyGreenstein(sunviewDot, -outScatter), ivo);
-            lightEnergy += pointDensity * RAYMARCH_STEP * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
-            transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
-        }    
+            lightEnergy += pointDensity * marchStep * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
+            transmittance1 *= exp(-pointDensity * marchStep * cloudAbsorption);
+        }
+        else
+        {
+            emptyStepsCount++;
+            if (emptyStepsCount == maxEmptyStepsCount)
+            {
+                marchStep = RAYMARCH_SHORT_STEP * LONG_STEP_MULTIPLIER;
+                usingLongSteps = true;
+            }
+        }
     }
 
     t = transmittance1;
