@@ -3,6 +3,7 @@ in vec3 rayDir;
 out vec4 FragColor;
 
 uniform vec3 cameraPos;
+uniform vec2 windowSize;
 
 uniform vec3 cloudsBoxCenter;
 uniform float cloudsBoxSideLength;
@@ -16,7 +17,6 @@ uniform float globalDensity;
 uniform vec4 clearColor;
 
 uniform sampler2D cloudsTexture;
-
 uniform sampler3D shapeTexture;
 uniform sampler3D detailsTexture;
 uniform sampler2D blueNoiseTexture;
@@ -27,6 +27,13 @@ uniform float cloudAbsorption;
 uniform float sunAbsorption;
 uniform float minLightEnergy;
 uniform float densityEps;
+
+uniform sampler2D previousFrame;
+uniform bool reprojectionOn;
+uniform int reprojIdx;
+const int[16] reprojMap = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+uniform float RAYMARCH_SHORT_STEP;
+uniform float LONG_STEP_MULTIPLIER;
 
 uniform float ivo;
 uniform float inScatter;
@@ -115,7 +122,6 @@ float getCloudValue(vec2 texCoords, float height)
     return SAT(R(SNnd, DNmod, 1, 0, 1)) * DA;
   }
 
-
 // to use when getCloudValue is fixed
 float lightmarchCloud(vec3 pos)
 { 
@@ -157,8 +163,6 @@ float ISextra(float phi)
 
 float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox, out float t)
 {
-    float RAYMARCH_STEP = 1.0f;
-    //float RAYMARCH_STEP = 1.0f;
     float density = 0.0f;
 
     // TODO: Blue noise offset of samplePoint
@@ -168,60 +172,92 @@ float raymarchCloud(vec3 cameraPos, vec3 rayDir, float dstInBox, float dstToBox,
     vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
 
     vec4 blueNoiseValue = texture(blueNoiseTexture, texCoords);
-    samplePoint += rayDir * RAYMARCH_STEP * 4 * (blueNoiseValue.r - 0.5);
+    samplePoint += rayDir * RAYMARCH_SHORT_STEP * 4 * (blueNoiseValue.r - 0.5);
 
     float lightEnergy = 0.0f;
     float transmittance1 = 1.0f;
 
-
-    for (int i = 0; i < dstInBox / RAYMARCH_STEP; i++)
+    float distanceTravelled = 0.0f;
+    float marchStep = RAYMARCH_SHORT_STEP;
+    bool usingLongSteps = false;
+    int emptyStepsCount = 0;
+    int maxEmptyStepsCount = int(ceil(LONG_STEP_MULTIPLIER));
+    while (distanceTravelled < dstInBox && lightEnergy < 1.0f)
     {
-        samplePoint += RAYMARCH_STEP * rayDir;
+        samplePoint += marchStep * rayDir;
+        distanceTravelled += marchStep;
+
         vec3 boxPoint = cloudsBoxCenter - samplePoint;
         vec2 texCoords = boxPoint.xz / cloudsBoxSideLength + 0.5f;
         float height = boxPoint.y / cloudsBoxHeight + 0.5f;
         float pointDensity = getCloudValue(texCoords, height);
 
-        if(pointDensity>densityEps)
+        if(pointDensity > densityEps)
         {
+            emptyStepsCount = 0;
+            if (usingLongSteps)
+            {
+                samplePoint -= marchStep * rayDir;
+                distanceTravelled -= marchStep;
+
+                marchStep = RAYMARCH_SHORT_STEP;
+                usingLongSteps = false;
+                continue;
+            }
+
             float sunviewDot = dot(normalize(lightPos), rayDir);
             float henyeyGreensteinComponent = L(max(HenyeyGreenstein(sunviewDot, inScatter), ISextra(sunviewDot)), HenyeyGreenstein(sunviewDot, -outScatter), ivo);
-            lightEnergy += pointDensity * RAYMARCH_STEP * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
-            transmittance1 *= exp(-pointDensity*RAYMARCH_STEP*cloudAbsorption);
-        }    
+            lightEnergy += pointDensity * marchStep * (lightmarchCloud(samplePoint)+henyeyGreensteinComponent) * transmittance1;
+            transmittance1 *= exp(-pointDensity * marchStep * cloudAbsorption);
+        }
+        else
+        {
+            emptyStepsCount++;
+            if (emptyStepsCount == maxEmptyStepsCount)
+            {
+                marchStep = RAYMARCH_SHORT_STEP * LONG_STEP_MULTIPLIER;
+                usingLongSteps = true;
+            }
+        }
     }
 
     t = transmittance1;
     return lightEnergy;
 }
 
-
-
 void main()
 {
-    vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
-    float dstToBox = intersection.x;
-    float dstInBox = intersection.y;
-    if (dstInBox == 0)
+    ivec2 reproj = ivec2(int(gl_FragCoord.x) % 4, int(gl_FragCoord.y) % 4);
+    int pixelReprojIdx = reprojMap[reproj.y * 4 + reproj.x];
+
+    if (!reprojectionOn || pixelReprojIdx == reprojIdx)
     {
-        discard;
-    }
+        vec2 intersection = testCloudsBoxIntersection(cameraPos, rayDir);
+        float dstToBox = intersection.x;
+        float dstInBox = intersection.y;
+        if (dstInBox == 0)
+        {
+            FragColor = clearColor;
+            return;
+        }
 
-    float transmittance = 0.0f;
+        float transmittance = 0.0f;
 
-    // ray-marching loop
-    float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
-
-
-    if (rayMarchedDensity < densityEps)
-    {
-      FragColor = vec4(clearColor.xyz, 0);
+        // ray-marching loop
+        float rayMarchedDensity = raymarchCloud(cameraPos, rayDir, dstInBox, dstToBox,transmittance);
+        if (rayMarchedDensity < densityEps)
+        {
+            FragColor = vec4(clearColor.xyz, 0);
+        }
+        else
+        {
+            vec3 outCol = vec3(rayMarchedDensity); 
+            outCol = outCol + clearColor.xyz*transmittance;
+            FragColor = vec4(outCol, 1.0f);
+        }
     }
     else
     {
-      vec3 outCol = vec3(rayMarchedDensity); 
-      outCol = outCol + clearColor.xyz*transmittance;
-      FragColor = vec4(outCol, 1.0f);
+        FragColor = texture(previousFrame, vec2(gl_FragCoord.x / windowSize.x, gl_FragCoord.y / windowSize.y));
     }
-
 }

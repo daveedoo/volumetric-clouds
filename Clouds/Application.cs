@@ -4,9 +4,6 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.GraphicsLibraryFramework;
-using System.Runtime.CompilerServices;
-using OpenTK.Windowing.Common;
-using System.Threading.Channels;
 
 namespace Clouds
 {
@@ -38,11 +35,26 @@ namespace Clouds
     public class Application : Window
     {
         private GLWrappers.Program program;
+        private GLWrappers.Program texQuadProgram;
+
         private Camera _camera;
         private GLWrappers.ComputeShader computeShader;
         private int vaoId;
         private int Shape3DTexHandle;
         private int Detail3DTexHandle;
+        
+        private const TextureUnit CloudsTextureUnit = TextureUnit.Texture0;
+        private const TextureUnit Shape3DTextureUnit = TextureUnit.Texture1;
+        private const TextureUnit Details3DTextureUnit = TextureUnit.Texture2;
+        private const TextureUnit BlueNoiseTextureUnit = TextureUnit.Texture3;
+        private TextureUnit TexQuadPrevTextureUnit = TextureUnit.Texture4;  // assignment at start, swaps every frame
+        private TextureUnit TexQuadTextureUnit = TextureUnit.Texture5;      // assignment at start, swaps every frame
+        private int TexQuadTextureID;
+        private int TexQuadPrevTextureID;
+
+        private int ReprojIdx = 0;
+        private bool ReprojectionOn = true;
+        private FBO fbo;
 
         private const int Shape3DTexSize = 128;
         private const int Detail3DTexSize = 128;
@@ -57,6 +69,8 @@ namespace Clouds
         private float sunAbsorption = 0.2f;
         private float minLightEnergy = 0.2f;
         private float densityEps = 0.001f;
+        private float raymarchShortStep = 1.0f;
+        private float longStepMultiplier = 3.0f;
 
         private System.Numerics.Vector3 cloudsBoxCenter = new(0.0f);
         private float cloudsBoxSideLength = 700.0f;
@@ -73,19 +87,51 @@ namespace Clouds
 
 
         private static readonly Vector2i defaultWindowSize = new(1600, 900);
+        private double FPS = 0.0f;
         public Application() : base(defaultWindowSize)
         {
             Title = "Clouds";
             _camera = new Camera(cameraPosition, (float)windowSize.X / windowSize.Y);
             _camera.Yaw = 240;
             _camera.Pitch = -10;
+
             animation_settings.ShapeSpeed = new System.Numerics.Vector2(-2f, 2f);
+            SetupFBO();
             SetupShaders();
             SetupVAO();
-            SetupCloudsTexture();
+            //SetupCloudsTexture(); // unused
             SetupPerlinGeneratedTextures();
             SetupBlueNoiseTexture();
             GeneratePerlinTextures();
+        }
+
+        private void SetupFBO()
+        {
+            TexQuadTextureID = GL.GenTexture();
+            GL.ActiveTexture(TexQuadTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, TexQuadTextureID);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba32f, defaultWindowSize.X, defaultWindowSize.Y, 0, PixelFormat.Rgba, PixelType.UnsignedByte, 0);
+
+
+            TexQuadPrevTextureID = GL.GenTexture();
+            GL.ActiveTexture(TexQuadPrevTextureUnit);
+            GL.BindTexture(TextureTarget.Texture2D, TexQuadPrevTextureID);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba32f, defaultWindowSize.X, defaultWindowSize.Y, 0, PixelFormat.Rgba, PixelType.UnsignedByte, 0);
+
+
+            fbo = new FBO();
+            fbo.SetColorAttachment(TexQuadTextureID);
+            FBO.Unbind();
         }
 
         private void SetupVAO()
@@ -121,20 +167,25 @@ namespace Clouds
             using Shader fragmentShader = new(ShaderType.FragmentShader, "../../../shaders/fragment.glsl");
             program = new(vertexShader, fragmentShader);
 
-
             computeShader = new ComputeShader("../../../shaders/Perlin3D_CS.glsl");
 
             SetCameraPosition();
             SetCloudBoxUniforms();
             SetGlobalUniforms();
+            SetOptimizationUniforms();
+            program.SetVec2("windowSize", defaultWindowSize);
+
+            using Shader texQuadVS = new(ShaderType.VertexShader, "../../../shaders/texQuadVS.glsl");
+            using Shader texQuadPS = new(ShaderType.FragmentShader, "../../../shaders/texQuadPS.glsl");
+            texQuadProgram = new(texQuadVS, texQuadPS);
+            texQuadProgram.SetInt("Texture", TexQuadTextureUnit - TextureUnit.Texture0);
+            program.SetInt("previousFrame", TexQuadPrevTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupCloudsTexture()
         {
-            const int cloudsTextureUnit = 0;
-
             int texId = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.ActiveTexture(CloudsTextureUnit);
             GL.BindTexture(TextureTarget.Texture2D, texId);
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -143,18 +194,15 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Clamp);
 
             (byte[] data, int texSize) = GetCloudTextureData();
-
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, texSize, texSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
-            //program.SetInt("cloudsTexture", cloudsTextureUnit);
+            program.SetInt("cloudsTexture", CloudsTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupBlueNoiseTexture()
         {
-            const int cloudsTextureUnit = 3; /// we have already 3 textures initialized
-
             int texId = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + cloudsTextureUnit);
+            GL.ActiveTexture(BlueNoiseTextureUnit);
             GL.BindTexture(TextureTarget.Texture2D, texId);
 
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -167,15 +215,13 @@ namespace Clouds
 
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, blueNoiseSize, blueNoiseSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte/* or different? */, data);
 
-            program.SetInt("blueNoiseTexture", cloudsTextureUnit);
+            program.SetInt("blueNoiseTexture", BlueNoiseTextureUnit - TextureUnit.Texture0);
         }
 
         private void SetupPerlinGeneratedTextures()         // shape and details 3D textures calculated inside compute shader using perlin 3D noise generation
         {
-            int TexUnit = 1;      // 1 becouse first texture is used inside SetupTexture()
-
             Shape3DTexHandle = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.ActiveTexture(Shape3DTextureUnit);
             GL.BindTexture(TextureTarget.Texture3D, Shape3DTexHandle);
 
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -186,11 +232,10 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.MirroredRepeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Shape3DTexSize, Shape3DTexSize, Shape3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Shape3DTexSize));
-            program.SetInt("shapeTexture", TexUnit);
-            TexUnit++;
+            program.SetInt("shapeTexture", Shape3DTextureUnit - TextureUnit.Texture0);
 
             Detail3DTexHandle = GL.GenTexture();
-            GL.ActiveTexture(TextureUnit.Texture0 + TexUnit);
+            GL.ActiveTexture(Details3DTextureUnit);
             GL.BindTexture(TextureTarget.Texture3D, Detail3DTexHandle);
 
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
@@ -201,7 +246,7 @@ namespace Clouds
             GL.TexParameter(TextureTarget.Texture3D, TextureParameterName.TextureWrapR, (int)TextureWrapMode.MirroredRepeat);
 
             GL.TexImage3D(TextureTarget.Texture3D, 0, PixelInternalFormat.Rgba32f, Detail3DTexSize, Detail3DTexSize, Detail3DTexSize, 0, PixelFormat.Rgba, PixelType.UnsignedByte, GenerateRandom3DBytes(Detail3DTexSize));
-            program.SetInt("detailsTexture", TexUnit);
+            program.SetInt("detailsTexture", Details3DTextureUnit - TextureUnit.Texture0);
         }
 
         private byte[] GenerateRandom3DBytes(int arraySize)
@@ -215,9 +260,8 @@ namespace Clouds
         // TODO: decide if byte type is the best
         private (byte[] data, int textureSize) GetCloudTextureData()
         {
-            int texSize = AllTexSize;
             //// mock
-            return (Enumerable.Repeat<byte>(255, 4 * texSize * texSize).ToArray(), texSize);
+            return (Enumerable.Repeat<byte>(255, 4 * AllTexSize * AllTexSize).ToArray(), AllTexSize);
 
             //var rand = new Random();
             //var res = new byte[4 * (int)Math.Pow(texSize, 2)];
@@ -266,6 +310,7 @@ namespace Clouds
             base.OnUpdateFrame(args);
             var time = args.Time;
             UpdateAnimation((float)time);
+            FPS = 1.0 / args.Time;
         }
 
         float accumulatedTime = 0;
@@ -300,7 +345,6 @@ namespace Clouds
             program.SetFloat("cloudsBoxSideLength", cloudsBoxSideLength);
             program.SetFloat("cloudsBoxHeight", cloudsBoxHeight);
         }
-
         private void SetGlobalUniforms()
         {
             program.SetFloat("globalCoverage", globalCoverage);
@@ -316,17 +360,45 @@ namespace Clouds
             program.SetFloat("minLightEnergy", minLightEnergy);
             program.SetFloat("sunAbsorption", sunAbsorption);
         }
-
+        private void SetOptimizationUniforms()
+        {
+            program.SetBool("reprojectionOn", ReprojectionOn);
+            program.SetFloat("RAYMARCH_SHORT_STEP", 1.0f);
+            program.SetFloat("LONG_STEP_MULTIPLIER", 3.0f);
+        }
 
         protected override void RenderScene()
         {
+            if (ReprojectionOn)
+            {
+                (TexQuadPrevTextureUnit, TexQuadTextureUnit) = (TexQuadTextureUnit, TexQuadPrevTextureUnit);
+                (TexQuadPrevTextureID, TexQuadTextureID) = (TexQuadTextureID, TexQuadPrevTextureID);
+                fbo.SetColorAttachment(TexQuadTextureID);
+                program.SetInt("previousFrame", TexQuadPrevTextureUnit - TextureUnit.Texture0);
+                texQuadProgram.SetInt("Texture", TexQuadTextureUnit - TextureUnit.Texture0);
+            }
+
+            fbo.Bind();
             program.Use();
-
-
             program.SetMat4("viewMtx", _camera.GetViewMatrix());
             program.SetMat4("projMtx", _camera.GetProjectionMatrix());
-
+            program.SetInt("reprojIdx", ReprojIdx);
+            ReprojIdx = (ReprojIdx + 1) % 16;
             GL.BindVertexArray(vaoId);
+            
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            GL.ClearColor(clearColor);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
+
+            GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
+
+            GL.Disable(EnableCap.Blend);
+
+
+            FBO.Unbind();
+            texQuadProgram.Use();
+            GL.Disable(EnableCap.DepthTest);
             GL.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 
@@ -424,6 +496,24 @@ namespace Clouds
             ImGui.ShowDemoWindow();
 
             ImGui.Begin("-");
+            ImGui.Text($"FPS: {FPS:F2}");
+            if (ImGui.TreeNodeEx("Optimization", ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                if (ImGui.Checkbox("Reprojection ON", ref ReprojectionOn))
+                {
+                    SetOptimizationUniforms();
+                }
+                if (ImGui.DragFloat("Raymarch short step", ref raymarchShortStep, 0.1f, 0.1f, 1000.0f))
+                {
+                    SetOptimizationUniforms();
+                }
+                if (ImGui.DragFloat("Long step multiplier", ref longStepMultiplier, 0.1f, 1.0f, 20.0f))
+                {
+                    SetOptimizationUniforms();
+                }
+                ImGui.TreePop();
+            }
+
             if (ImGui.TreeNodeEx("Clouds box", ImGuiTreeNodeFlags.DefaultOpen))
             {
                 if (ImGui.DragFloat3("Center", ref cloudsBoxCenter, 0.01f))
@@ -535,10 +625,8 @@ namespace Clouds
                     clearColor.B = backgroundColor[2];
                     SetGlobalUniforms();
                 }
-
                 ImGui.TreePop();
             }
-
 
 
             ImGui.End();

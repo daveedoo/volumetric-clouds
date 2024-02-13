@@ -105,5 +105,13 @@ namespace Clouds.GLWrappers
                 GL.Uniform1(location, value);
             });
         }
+
+        public void SetBool(string uniformName, bool value)
+        {
+            ExecuteUniformVariableOperation(uniformName, (int location) =>
+            {
+                GL.Uniform1(location, value ? 1 : 0);
+            });
+        }
     }
 }
